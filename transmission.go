@@ -1,4 +1,4 @@
-package client
+package transmission
 
 import (
 	"errors"
@@ -74,7 +74,7 @@ func (c client) Get(id int64, fields []string) (torrent.Torrent, error) {
 	return empty, errors.New("torrent not found")
 }
 
-func (c client) GetAll(fields []string) ([]torrent.Torrent, error) {
+func (c client) GetAll(ids []int64, fields []string) ([]torrent.Torrent, error) {
 	var empty []torrent.Torrent
 	if len(fields) == 0 {
 		return empty, errors.New("request must includes at least one field")
@@ -88,7 +88,7 @@ func (c client) GetAll(fields []string) ([]torrent.Torrent, error) {
 		},
 		Payload: torrent.RequestPayload{
 			Method:    torrent.MethodGet,
-			Arguments: torrent.RequestArgs{Fields: fields},
+			Arguments: torrent.RequestArgs{Ids: ids, Fields: fields},
 		},
 	})
 
