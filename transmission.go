@@ -284,7 +284,7 @@ func (c *client) fetch(request Request) (Response, error) {
 	return response, nil
 }
 
-func (c client) getAll(ids []int64, fields []string) ([]Torrent, error) {
+func (c *client) getAll(ids []int64, fields []string) ([]Torrent, error) {
 	var empty []Torrent
 	if len(fields) == 0 {
 		return empty, errors.New("request must includes at least one field")
@@ -306,7 +306,7 @@ func (c client) getAll(ids []int64, fields []string) ([]Torrent, error) {
 	return response.Args.Torrents, nil
 }
 
-func (c client) Get(id int64, fields []string) (Torrent, error) {
+func (c *client) Get(id int64, fields []string) (Torrent, error) {
 	var empty Torrent
 	if len(fields) == 0 {
 		return empty, errors.New("request must includes at least one field")
@@ -326,10 +326,10 @@ func (c client) Get(id int64, fields []string) (Torrent, error) {
 	return empty, errors.New("torrent not found")
 }
 
-func (c client) GetAll(fields []string) ([]Torrent, error) {
+func (c *client) GetAll(fields []string) ([]Torrent, error) {
 	return c.getAll([]int64{}, fields)
 }
 
-func (c client) GetAllByIds(ids []int64, fields []string) ([]Torrent, error) {
+func (c *client) GetAllByIds(ids []int64, fields []string) ([]Torrent, error) {
 	return c.getAll(ids, fields)
 }
