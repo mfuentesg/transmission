@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 )
@@ -276,7 +275,6 @@ func (c *client) fetch(request Request) (Response, error) {
 		return empty, err
 	}
 
-	fmt.Println(string(buf))
 	defer resp.Body.Close()
 
 	var response Response
