@@ -306,6 +306,11 @@ func (c *client) getAll(ids []int64, fields []string) ([]Torrent, error) {
 	return response.Args.Torrents, nil
 }
 
+func (c *client) Ping() error {
+	_, err := c.fetch(Request{})
+	return err
+}
+
 func (c *client) Get(id int64, fields []string) (Torrent, error) {
 	var empty Torrent
 	if len(fields) == 0 {
