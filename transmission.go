@@ -11,20 +11,25 @@ import (
 type Method string
 
 const (
+	// actions
 	MethodStart      Method = "torrent-start"
 	MethodStartNow   Method = "torrent-start-now"
 	MethodStop       Method = "torrent-stop"
 	MethodVerify     Method = "torrent-verify"
 	MethodReannounce Method = "torrent-reannounce"
-	MethodSet        Method = "torrent-set"
-	MethodGet        Method = "torrent-get"
-	MethodAdd        Method = "torrent-add"
-	MethodRemove     Method = "torrent-remove"
-	MethodMove       Method = "torrent-set-location"
-	MethodRename     Method = "torrent-rename-path"
 
-	ResponseResultError   = "error"
-	ResponseResultSuccess = "success"
+	// mutators
+	MethodSet Method = "torrent-set"
+
+	// accessors
+	MethodGet Method = "torrent-get"
+
+	MethodAdd    Method = "torrent-add"
+	MethodRemove Method = "torrent-remove"
+	MethodMove   Method = "torrent-set-location"
+	MethodRename Method = "torrent-rename-path"
+
+	ResponseResultError = "error"
 
 	SessionIdHeader = "X-Transmission-Session-Id"
 )
@@ -142,10 +147,11 @@ type Torrent struct {
 	MaxConnectedPeers       int64         `json:"maxConnectedPeers,omitempty"`
 	MetadataPercentComplete float64       `json:"metadataPercentComplete,omitempty"`
 	Name                    string        `json:"name,omitempty"`
+	Path                    string        `json:"path,omitempty"` // Used
 	PeerLimit               int64         `json:"peer-limit,omitempty"`
 	Peers                   []Peer        `json:"peers,omitempty"`
 	PeersConnected          int64         `json:"peersConnected,omitempty"`
-	PeersFrom               PeerFrom      `json:"peersFrom,omitempty"`
+	PeersFrom               []PeerFrom    `json:"peersFrom,omitempty"`
 	PeersGettingFromUs      int64         `json:"peersGettingFromUs,omitempty"`
 	PeersSendingToUs        int64         `json:"peersSendingToUs,omitempty"`
 	PercentDone             float64       `json:"percentDone,omitempty"`
@@ -181,12 +187,48 @@ type Torrent struct {
 
 type RequestArgs struct {
 	Ids    []int64  `json:"ids,omitempty"`
-	Fields []string `json:"fields"`
-	Format string   `json:"format"`
+	Fields []string `json:"fields,omitempty"`
+	Format string   `json:"format,omitempty"`
+}
+
+type AddPayload struct {
+	Cookies           string  `json:"cookies,omitempty"`
+	DownloadDir       string  `json:"download-dir,omitempty"`
+	Filename          string  `json:"filename,omitempty"`
+	MetaInfo          string  `json:"metainfo,omitempty"`
+	Paused            bool    `json:"paused,omitempty"`
+	PeerLimit         int64   `json:"peer-limit,omitempty"`
+	BandwidthPriority int64   `json:"bandwidthPriority,omitempty"`
+	FilesWanted       []int64 `json:"files-wanted,omitempty"`
+	FilesUnwanted     []int64 `json:"files-unwanted,omitempty"`
+	PriorityHigh      []int64 `json:"priority-high,omitempty"`
+	PriorityLow       []int64 `json:"priority-low,omitempty"`
+	PriorityNormal    []int64 `json:"priority-normal,omitempty"`
+}
+
+type MovePayload struct {
+	Ids      []string `json:"ids,omitempty"`
+	Location string   `json:"location,omitempty"`
+	Move     bool     `json:"move,omitempty"`
+}
+
+type RemovePayload struct {
+	Ids             []string `json:"ids,omitempty"`
+	DeleteLocalData bool     `json:"delete-local-data,omitempty"`
+}
+
+type RenamePayload struct {
+	Ids  string `json:"ids,omitempty"`
+	Path string `json:"path"`
+	Name string `json:"name"`
 }
 
 type ResponseArgs struct {
-	Torrents []Torrent `json:"torrents"`
+	Torrents     []Torrent `json:"torrents,omitempty"`
+	TorrentAdded Torrent   `json:"torrent-added,omitempty"`
+	Id           int64     `json:"id,omitempty"`
+	Name         string    `json:"name,omitempty""`
+	Path         string    `json:"path,omitempty""`
 }
 
 type Response struct {
@@ -202,13 +244,13 @@ type RequestAuth struct {
 
 type Request struct {
 	Method    Method      `json:"method,omitempty"`
-	Arguments RequestArgs `json:"arguments,omitempty"`
+	Arguments interface{} `json:"arguments,omitempty"`
 	Tag       int64       `json:"tag,omitempty"`
 }
 
 type Option func(*options)
 
-type client struct {
+type Client struct {
 	options
 }
 
@@ -232,15 +274,15 @@ func WithBasicAuth(user, password string) Option {
 	}
 }
 
-func New(opts ...Option) *client {
+func New(opts ...Option) *Client {
 	defaults := options{}
 	for _, o := range opts {
 		o(&defaults)
 	}
-	return &client{options: defaults}
+	return &Client{options: defaults}
 }
 
-func (c *client) fetch(request Request) (Response, error) {
+func (c *Client) fetch(request Request) (Response, error) {
 	var empty Response
 	body, err := json.Marshal(&request)
 	if err != nil {
@@ -284,7 +326,7 @@ func (c *client) fetch(request Request) (Response, error) {
 	return response, nil
 }
 
-func (c *client) getAll(ids []int64, fields []string) ([]Torrent, error) {
+func (c *Client) getAll(ids []int64, fields []string) ([]Torrent, error) {
 	var empty []Torrent
 	if len(fields) == 0 {
 		return empty, errors.New("request must includes at least one field")
@@ -306,12 +348,12 @@ func (c *client) getAll(ids []int64, fields []string) ([]Torrent, error) {
 	return response.Args.Torrents, nil
 }
 
-func (c *client) Ping() error {
+func (c *Client) Ping() error {
 	_, err := c.fetch(Request{})
 	return err
 }
 
-func (c *client) Get(id int64, fields []string) (Torrent, error) {
+func (c *Client) Get(id int64, fields []string) (Torrent, error) {
 	var empty Torrent
 	if len(fields) == 0 {
 		return empty, errors.New("request must includes at least one field")
@@ -322,19 +364,116 @@ func (c *client) Get(id int64, fields []string) (Torrent, error) {
 		return empty, err
 	}
 
-	for _, t := range torrents {
-		if t.Id == id {
-			return t, nil
-		}
+	if len(torrents) == 1 {
+		return torrents[0], nil
 	}
 
 	return empty, errors.New("torrent not found")
 }
 
-func (c *client) GetAll(fields []string) ([]Torrent, error) {
-	return c.getAll([]int64{}, fields)
+func (c *Client) GetAll(ids []int64, fields []string) ([]Torrent, error) {
+	return c.getAll(ids, fields)
 }
 
-func (c *client) GetAllByIds(ids []int64, fields []string) ([]Torrent, error) {
-	return c.getAll(ids, fields)
+// Torrent actions
+func (c *Client) performAction(ids []int64, method Method) error {
+	resp, err := c.fetch(Request{
+		Method:    method,
+		Arguments: RequestArgs{Ids: ids},
+	})
+
+	if err != nil {
+		return err
+	}
+
+	if resp.Result == ResponseResultError {
+		return errors.New("could not perform action")
+	}
+	return nil
+}
+
+func (c *Client) Start(id int64) error {
+	return c.performAction([]int64{id}, MethodStart)
+}
+
+func (c *Client) StartAll(ids []int64) error {
+	return c.performAction(ids, MethodStart)
+}
+
+func (c *Client) StartNow(id int64) error {
+	return c.performAction([]int64{id}, MethodStartNow)
+}
+
+func (c *Client) StartAllNow(ids []int64) error {
+	return c.performAction(ids, MethodStartNow)
+}
+
+func (c *Client) Stop(id int64) error {
+	return c.performAction([]int64{id}, MethodStop)
+}
+
+func (c *Client) StopAll(ids []int64) error {
+	return c.performAction(ids, MethodStop)
+}
+
+func (c *Client) Verify(id int64) error {
+	return c.performAction([]int64{id}, MethodVerify)
+}
+
+func (c *Client) VerifyAll(ids []int64) error {
+	return c.performAction(ids, MethodVerify)
+}
+
+func (c *Client) Reannounce(id int64) error {
+	return c.performAction([]int64{id}, MethodReannounce)
+}
+
+func (c *Client) ReannounceAll(ids []int64) error {
+	return c.performAction(ids, MethodReannounce)
+}
+
+// Torrent mutators
+
+// Add torrent
+func (c *Client) Add(args AddPayload) (Torrent, error) {
+	var empty Torrent
+	resp, err := c.fetch(Request{
+		Method:    MethodAdd,
+		Arguments: args,
+	})
+	if err != nil {
+		return empty, err
+	}
+	return resp.Args.TorrentAdded, nil
+}
+
+// Remove torrent
+func (c *Client) Remove(args) error {
+	_, err := c.fetch(Request{
+		Method:    MethodRemove,
+		Arguments: args,
+	})
+	return err
+}
+
+func (c *Client) Rename(args RenamePayload) (Torrent, error) {
+	var torrent Torrent
+	if len(args.Ids) > 1 {
+		return empty, errors.New("could not edit multiple torrents at the same time")
+	}
+
+	resp, err := c.fetch(Request{
+		Method:    MethodRename,
+		Arguments: args,
+	})
+
+	if err != nil {
+		return torrent, err
+	}
+
+	torrent.Id = resp.Args.Id
+	torrent.Name = resp.Args.Name
+	torrent.Path = resp.Args.Path
+
+	return torrent, nil
 }
