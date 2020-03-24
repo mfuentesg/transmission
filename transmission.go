@@ -227,8 +227,8 @@ type ResponseArgs struct {
 	Torrents     []Torrent `json:"torrents,omitempty"`
 	TorrentAdded Torrent   `json:"torrent-added,omitempty"`
 	Id           int64     `json:"id,omitempty"`
-	Name         string    `json:"name,omitempty""`
-	Path         string    `json:"path,omitempty""`
+	Name         string    `json:"name,omitempty"`
+	Path         string    `json:"path,omitempty"`
 }
 
 type Response struct {
@@ -448,7 +448,7 @@ func (c *Client) Add(args AddPayload) (Torrent, error) {
 }
 
 // Remove torrent
-func (c *Client) Remove(args) error {
+func (c *Client) Remove(args RemovePayload) error {
 	_, err := c.fetch(Request{
 		Method:    MethodRemove,
 		Arguments: args,
@@ -459,7 +459,7 @@ func (c *Client) Remove(args) error {
 func (c *Client) Rename(args RenamePayload) (Torrent, error) {
 	var torrent Torrent
 	if len(args.Ids) > 1 {
-		return empty, errors.New("could not edit multiple torrents at the same time")
+		return torrent, errors.New("could not edit multiple torrents at the same time")
 	}
 
 	resp, err := c.fetch(Request{
