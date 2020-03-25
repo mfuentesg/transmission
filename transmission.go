@@ -182,7 +182,7 @@ type PortCheck struct {
 	PortIsOpen bool `json:"port-is-open"`
 }
 
-type Blocklist struct {
+type BlockList struct {
 	BlockListSize int64 `json:"blocklist-size"`
 }
 
