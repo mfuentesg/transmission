@@ -3,7 +3,7 @@ package transmission
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 )
@@ -11,194 +11,69 @@ import (
 type Method string
 
 const (
-	// actions
-	MethodStart      Method = "torrent-start"
-	MethodStartNow   Method = "torrent-start-now"
-	MethodStop       Method = "torrent-stop"
-	MethodVerify     Method = "torrent-verify"
-	MethodReannounce Method = "torrent-reannounce"
+	MethodTorrentStart      Method = "torrent-start"
+	MethodTorrentStartNow   Method = "torrent-start-now"
+	MethodTorrentStop       Method = "torrent-stop"
+	MethodTorrentVerify     Method = "torrent-verify"
+	MethodTorrentReannounce Method = "torrent-reannounce"
+	MethodTorrentSet        Method = "torrent-set"
+	MethodTorrentGet        Method = "torrent-get"
+	MethodTorrentAdd        Method = "torrent-add"
+	MethodTorrentRemove     Method = "torrent-remove"
+	MethodTorrentMove       Method = "torrent-set-location"
+	MethodTorrentRename     Method = "torrent-rename-path"
 
-	// mutators
-	MethodSet Method = "torrent-set"
+	MethodSessionClose Method = "session-close"
+	MethodSessionGet   Method = "session-get"
+	MethodSessionSet   Method = "session-set"
+	MethodSessionStats Method = "session-stats"
 
-	// accessors
-	MethodGet Method = "torrent-get"
+	MethodQueueTop    Method = "queue-move-top"
+	MethodQueueUp     Method = "queue-move-up"
+	MethodQueueDown   Method = "queue-move-down"
+	MethodQueueBottom Method = "queue-move-bottom"
 
-	MethodAdd    Method = "torrent-add"
-	MethodRemove Method = "torrent-remove"
-	MethodMove   Method = "torrent-set-location"
-	MethodRename Method = "torrent-rename-path"
-
-	ResponseResultError = "error"
-
-	SessionIdHeader = "X-Transmission-Session-Id"
+	ResponseResultSuccess = "success"
+	SessionIdHeader       = "X-Transmission-Session-Id"
 )
 
-type File struct {
-	BytesCompleted int64  `json:"bytesCompleted,omitempty"`
-	Length         int64  `json:"length,omitempty"`
-	Name           string `json:"name,omitempty"`
+type response struct {
+	Result string                 `json:"result,omitempty"`
+	Args   map[string]interface{} `json:"arguments,omitempty"`
+	Tag    int64                  `json:"tag"`
 }
 
-type FileStat struct {
-	BytesCompleted int64 `json:"bytesCompleted,omitempty"`
-	Wanted         bool  `json:"wanted,omitempty"`
-	Priority       int64 `json:"priority,omitempty"`
+type request struct {
+	Method     Method      `json:"method,omitempty"`
+	Arguments  interface{} `json:"arguments,omitempty"`
+	Tag        int64       `json:"tag"`
+	AvoidRetry bool        `json:"-"`
 }
 
-type Peer struct {
-	Address            string  `json:"address,omitempty"`
-	ClientName         string  `json:"clientName,omitempty"`
-	ClientIsChoked     bool    `json:"clientIsChoked,omitempty"`
-	ClientIsInterested bool    `json:"clientIsInterested,omitempty"`
-	FlagStr            string  `json:"flagStr,omitempty"`
-	IsDownloadingFrom  bool    `json:"isDownloadingFrom,omitempty"`
-	IsEncrypted        bool    `json:"isEncrypted,omitempty"`
-	IsIncoming         bool    `json:"isIncoming,omitempty"`
-	IsUploadingTo      bool    `json:"isUploadingTo,omitempty"`
-	IsUTP              bool    `json:"isUTP,omitempty"`
-	PeerIsChoked       bool    `json:"peerIsChoked,omitempty"`
-	PeerIsInterested   bool    `json:"peerIsInterested,omitempty"`
-	Port               int64   `json:"port,omitempty"`
-	Progress           float64 `json:"progress,omitempty"`
-	RateToClient       int64   `json:"rateToClient,omitempty"`
-	RateToPeer         int64   `json:"rateToPeer,omitempty"`
+type TorrentAction struct {
+	Ids interface{} `json:"ids"`
 }
 
-type PeerFrom struct {
-	FromCache    int64 `json:"fromCache,omitempty"`
-	FromDht      int64 `json:"fromDht,omitempty"`
-	FromIncoming int64 `json:"fromIncoming,omitempty"`
-	FromLpd      int64 `json:"fromLpd,omitempty"`
-	FromLtep     int64 `json:"fromLtep,omitempty"`
-	FromPex      int64 `json:"fromPex,omitempty"`
-	FromTracker  int64 `json:"fromTracker,omitempty"`
+type QueueMovement struct {
+	Ids interface{} `json:"ids"`
 }
 
-type Tracker struct {
-	Announce string `json:"announce,omitempty"`
-	Id       int64  `json:"id,omitempty"`
-	Scrape   string `json:"scrape,omitempty"`
-	Tier     int64  `json:"tier,omitempty"`
+type TorrentGet struct {
+	Ids    interface{} `json:"ids,omitempty"`
+	Fields []string    `json:"fields,omitempty"`
+	// This fields supports only objects or table
+	// ("table"  format always returns same as "objects" format)s
+	// Format string   `json:"format,omitempty"`
 }
 
-type TrackerStat struct {
-	Announce              string `json:"announce,omitempty"`
-	AnnounceState         int64  `json:"announceState,omitempty"`
-	DownloadCount         int64  `json:"downloadCount,omitempty"`
-	HasAnnounced          bool   `json:"hasAnnounced,omitempty"`
-	HasScraped            bool   `json:"hasScraped,omitempty"`
-	Host                  string `json:"host,omitempty"`
-	Id                    int64  `json:"id,omitempty"`
-	IsBackup              bool   `json:"isBackup,omitempty"`
-	LastAnnouncePeerCount int64  `json:"lastAnnouncePeerCount,omitempty"`
-	LastAnnounceResult    string `json:"lastAnnounceResult,omitempty"`
-	LastAnnounceStartTime int64  `json:"lastAnnounceStartTime,omitempty"`
-	LastAnnounceSucceeded bool   `json:"lastAnnounceSucceeded,omitempty"`
-	LastAnnounceTime      int64  `json:"lastAnnounceTime,omitempty"`
-	LastAnnounceTimedOut  bool   `json:"lastAnnounceTimedOut,omitempty"`
-	LastScrapeResult      string `json:"lastScrapeResult,omitempty"`
-	LastScrapeStartTime   int64  `json:"lastScrapeStartTime,omitempty"`
-	LastScrapeSucceeded   bool   `json:"lastScrapeSucceeded,omitempty"`
-	LastScrapeTime        int64  `json:"lastScrapeTime,omitempty"`
-	LastScrapeTimedOut    bool   `json:"lastScrapeTimedOut,omitempty"`
-	LeecherCount          int64  `json:"leecherCount,omitempty"`
-	NextAnnounceTime      int64  `json:"nextAnnounceTime,omitempty"`
-	NextScrapeTime        int64  `json:"nextScrapeTime,omitempty"`
-	Scrape                string `json:"scrape,omitempty"`
-	ScrapeState           int64  `json:"scrapeState,omitempty"`
-	SeederCount           int64  `json:"seederCount,omitempty"`
-	Tier                  int64  `json:"tier,omitempty"`
-}
-
-type Torrent struct {
-	ActivityDate            int64         `json:"activityDate,omitempty"`
-	AddedDate               int64         `json:"addedDate,omitempty"`
-	BandwidthPriority       int64         `json:"bandwidthPriority,omitempty"`
-	Comment                 string        `json:"comment,omitempty"`
-	CorruptEver             int64         `json:"corruptEver,omitempty"`
-	Creator                 string        `json:"creator,omitempty"`
-	DateCreated             int64         `json:"dateCreated,omitempty"`
-	DesiredAvailable        int64         `json:"desiredAvailable,omitempty"`
-	DoneDate                int64         `json:"doneDate,omitempty"`
-	DownloadDir             string        `json:"downloadDir,omitempty"`
-	DownloadedEver          int64         `json:"downloadedEver,omitempty"`
-	DownloadLimit           int64         `json:"downloadLimit,omitempty"`
-	DownloadLimited         bool          `json:"downloadLimited,omitempty"`
-	EditDate                int64         `json:"editDate,omitempty"`
-	Error                   int64         `json:"error,omitempty"`
-	ErrorString             string        `json:"errorString,omitempty"`
-	Eta                     int64         `json:"eta,omitempty"`
-	EtaIdle                 int64         `json:"etaIdle,omitempty"`
-	Files                   []File        `json:"files,omitempty"`
-	FileStats               []FileStat    `json:"fileStats,omitempty"`
-	HashString              string        `json:"hashString,omitempty"`
-	HaveUnchecked           int64         `json:"haveUnchecked,omitempty"`
-	HaveValid               int64         `json:"haveValid,omitempty"`
-	HonorsSessionLimits     bool          `json:"honorsSessionLimits,omitempty"`
-	Id                      int64         `json:"id,omitempty"`
-	IsFinished              bool          `json:"isFinished,omitempty"`
-	IsPrivate               bool          `json:"isPrivate,omitempty"`
-	IsStalled               bool          `json:"isStalled,omitempty"`
-	Labels                  []string      `json:"labels,omitempty"`
-	LeftUntilDone           int64         `json:"leftUntilDone,omitempty"`
-	MagnetLink              string        `json:"magnetLink,omitempty"`
-	ManualAnnounceTime      int64         `json:"manualAnnounceTime,omitempty"`
-	MaxConnectedPeers       int64         `json:"maxConnectedPeers,omitempty"`
-	MetadataPercentComplete float64       `json:"metadataPercentComplete,omitempty"`
-	Name                    string        `json:"name,omitempty"`
-	Path                    string        `json:"path,omitempty"` // Used
-	PeerLimit               int64         `json:"peer-limit,omitempty"`
-	Peers                   []Peer        `json:"peers,omitempty"`
-	PeersConnected          int64         `json:"peersConnected,omitempty"`
-	PeersFrom               []PeerFrom    `json:"peersFrom,omitempty"`
-	PeersGettingFromUs      int64         `json:"peersGettingFromUs,omitempty"`
-	PeersSendingToUs        int64         `json:"peersSendingToUs,omitempty"`
-	PercentDone             float64       `json:"percentDone,omitempty"`
-	Pieces                  string        `json:"pieces,omitempty"`
-	PieceCount              int64         `json:"pieceCount,omitempty"`
-	PieceSize               int64         `json:"pieceSize,omitempty"`
-	Priorities              []int64       `json:"priorities,omitempty"`
-	QueuePosition           int64         `json:"queuePosition,omitempty"`
-	RateDownload            int64         `json:"rateDownload,omitempty"`
-	RateUpload              int64         `json:"rateUpload,omitempty"`
-	RecheckProgress         float64       `json:"recheckProgress,omitempty"`
-	SecondsDownloading      int64         `json:"secondsDownloading,omitempty"`
-	SecondsSeeding          int64         `json:"secondsSeeding,omitempty"`
-	SeedIdleLimit           int64         `json:"seedIdleLimit,omitempty"`
-	SeedIdleMode            int64         `json:"seedIdleMode,omitempty"`
-	SeedRatioLimit          float64       `json:"seedRatioLimit,omitempty"`
-	SeedRatioMode           int64         `json:"seedRatioMode,omitempty"`
-	SizeWhenDone            int64         `json:"sizeWhenDone,omitempty"`
-	StartDate               int64         `json:"startDate,omitempty"`
-	Status                  int64         `json:"status,omitempty"`
-	Trackers                []Tracker     `json:"trackers,omitempty"`
-	TrackerStats            []TrackerStat `json:"trackerStats,omitempty"`
-	TotalSize               int64         `json:"totalSize,omitempty"`
-	TorrentFile             string        `json:"torrentFile,omitempty"`
-	UploadedEver            int64         `json:"uploadedEver,omitempty"`
-	UploadLimit             int64         `json:"uploadLimit,omitempty"`
-	UploadLimited           bool          `json:"uploadLimited,omitempty"`
-	UploadRatio             float64       `json:"uploadRatio,omitempty"`
-	Wanted                  []int64       `json:"wanted,omitempty"`
-	WebSeeds                []string      `json:"webseeds,omitempty"`
-	WebSeedsSendingToUs     int64         `json:"webseedsSendingToUs,omitempty"`
-}
-
-type RequestArgs struct {
-	Ids    []int64  `json:"ids,omitempty"`
-	Fields []string `json:"fields,omitempty"`
-	Format string   `json:"format,omitempty"`
-}
-
-type AddPayload struct {
+type TorrentAdd struct {
 	Cookies           string  `json:"cookies,omitempty"`
 	DownloadDir       string  `json:"download-dir,omitempty"`
 	Filename          string  `json:"filename,omitempty"`
 	MetaInfo          string  `json:"metainfo,omitempty"`
 	Paused            bool    `json:"paused,omitempty"`
-	PeerLimit         int64   `json:"peer-limit,omitempty"`
-	BandwidthPriority int64   `json:"bandwidthPriority,omitempty"`
+	PeerLimit         int64   `json:"peer-limit"`
+	BandwidthPriority int64   `json:"bandwidthPriority"`
 	FilesWanted       []int64 `json:"files-wanted,omitempty"`
 	FilesUnwanted     []int64 `json:"files-unwanted,omitempty"`
 	PriorityHigh      []int64 `json:"priority-high,omitempty"`
@@ -206,46 +81,109 @@ type AddPayload struct {
 	PriorityNormal    []int64 `json:"priority-normal,omitempty"`
 }
 
-type MovePayload struct {
-	Ids      []string `json:"ids,omitempty"`
-	Location string   `json:"location,omitempty"`
-	Move     bool     `json:"move,omitempty"`
+type TorrentMove struct {
+	Ids      interface{} `json:"ids,omitempty"`
+	Location string      `json:"location,omitempty"`
+	Move     bool        `json:"move,omitempty"`
 }
 
-type RemovePayload struct {
-	Ids             []string `json:"ids,omitempty"`
-	DeleteLocalData bool     `json:"delete-local-data,omitempty"`
+type TorrentRemove struct {
+	Ids             interface{} `json:"ids,omitempty"`
+	DeleteLocalData bool        `json:"delete-local-data,omitempty"`
 }
 
-type RenamePayload struct {
-	Ids  string `json:"ids,omitempty"`
-	Path string `json:"path"`
-	Name string `json:"name"`
+type TorrentRename struct {
+	Ids  interface{} `json:"ids,omitempty"`
+	Path string      `json:"path"` // represents current torrent name
+	Name string      `json:"name"`
 }
 
-type ResponseArgs struct {
-	Torrents     []Torrent `json:"torrents,omitempty"`
-	TorrentAdded Torrent   `json:"torrent-added,omitempty"`
-	Id           int64     `json:"id,omitempty"`
-	Name         string    `json:"name,omitempty"`
-	Path         string    `json:"path,omitempty"`
+type TorrentSet struct {
+	BandwidthPriority   int64              `json:"bandwidthPriority"`
+	DownloadLimit       int64              `json:"downloadLimit"`
+	DownloadLimited     bool               `json:"downloadLimited,omitempty"`
+	FilesWanted         []int64            `json:"files-wanted,omitempty"`
+	FilesUnwanted       []int64            `json:"files-unwanted,omitempty"`
+	HonorsSessionLimits bool               `json:"honorsSessionLimits,omitempty"`
+	Ids                 interface{}        `json:"ids,omitempty"`
+	Labels              []string           `json:"labels,omitempty"`
+	Location            string             `json:"location,omitempty"`
+	PeerLimit           int64              `json:"peer-limit"`
+	PriorityHigh        []int64            `json:"priority-high,omitempty"`
+	PriorityLow         []int64            `json:"priority-low,omitempty"`
+	PriorityNormal      []int64            `json:"priority-normal,omitempty"`
+	QueuePosition       int64              `json:"queuePosition"`
+	SeedIdleLimit       int64              `json:"seedIdleLimit"`
+	SeedIdleMode        int64              `json:"seedIdleMode"`
+	SeedRatioLimit      float64            `json:"seedRatioLimit,omitempty"`
+	SeedRatioMode       int64              `json:"seedRatioMode"`
+	TrackerAdd          []string           `json:"trackerAdd,omitempty"`
+	TrackerRemove       []int64            `json:"trackerRemove,omitempty"`
+	TrackerReplace      []map[int64]string `json:"trackerReplace,omitempty"`
+	UploadLimit         int64              `json:"uploadLimit"`
+	UploadLimited       bool               `json:"uploadLimited,omitempty"`
 }
 
-type Response struct {
-	Result string       `json:"result,omitempty"`
-	Args   ResponseArgs `json:"arguments,omitempty"`
-	Tag    int64        `json:"tag,omitempty"`
+type SessionGet struct {
+	Fields []string `json:"fields,omitempty"`
 }
 
-type RequestAuth struct {
-	Username string
-	Password string
+type SessionSet struct {
+	AltSpeedDown              int64   `json:"alt-speed-down,omitempty"`
+	AltSpeedEnabled           bool    `json:"alt-speed-enabled,omitempty"`
+	AltSpeedTimeBegin         int64   `json:"alt-speed-time-begin,omitempty"`
+	AltSpeedTimeEnabled       bool    `json:"alt-speed-time-enabled,omitempty"`
+	AltSpeedTimeEnd           int64   `json:"alt-speed-time-end,omitempty"`
+	AltSpeedTimeDay           int64   `json:"alt-speed-time-day,omitempty"`
+	AltSpeedUp                int64   `json:"alt-speed-up,omitempty"`
+	BlockListUrl              string  `json:"blocklist-url,omitempty"`
+	BlockListEnabled          bool    `json:"blocklist-enabled,omitempty"`
+	CacheSizeMb               int64   `json:"cache-size-mb,omitempty"`
+	DownloadDir               string  `json:"download-dir,omitempty"`
+	DownloadQueueSize         int64   `json:"download-queue-size,omitempty"`
+	DownloadQueueEnabled      bool    `json:"download-queue-enabled,omitempty"`
+	DhtEnabled                bool    `json:"dht-enabled,omitempty"`
+	Encryption                string  `json:"encryption,omitempty"`
+	IdleSeedingLimit          int64   `json:"idle-seeding-limit,omitempty"`
+	IdleSeedingLimitEnabled   bool    `json:"idle-seeding-limit-enabled,omitempty"`
+	IncompleteDir             string  `json:"incomplete-dir,omitempty"`
+	IncompleteDirEnabled      bool    `json:"incomplete-dir-enabled,omitempty"`
+	LpdEnabled                bool    `json:"lpd-enabled,omitempty"`
+	PeerLimitGlobal           int64   `json:"peer-limit-global,omitempty"`
+	PeerLimitPerTorrent       int64   `json:"peer-limit-per-torrent,omitempty"`
+	PexEnabled                bool    `json:"pex-enabled,omitempty"`
+	PeerPort                  int64   `json:"peer-port,omitempty"`
+	PeerPortRandomOnStart     bool    `json:"peer-port-random-on-start,omitempty"`
+	PortForwardingEnabled     bool    `json:"port-forwarding-enabled,omitempty"`
+	QueueStalledEnabled       bool    `json:"queue-stalled-enabled,omitempty"`
+	QueueStalledMinutes       int64   `json:"queue-stalled-minutes,omitempty"`
+	RenamePartialFiles        bool    `json:"rename-partial-files,omitempty"`
+	ScriptTorrentDoneFilename string  `json:"script-torrent-done-filename,omitempty"`
+	ScriptTorrentDoneEnabled  bool    `json:"script-torrent-done-enabled,omitempty"`
+	SeedRatioLimit            float64 `json:"seedRatioLimit,omitempty"`
+	SeedRatioLimited          bool    `json:"seedRatioLimited,omitempty"`
+	SeedQueueSize             int64   `json:"seed-queue-size,omitempty"`
+	SeedQueueEnabled          bool    `json:"seed-queue-enabled,omitempty"`
+	SpeedLimitDown            int64   `json:"speed-limit-down,omitempty"`
+	SpeedLimitDownEnabled     bool    `json:"speed-limit-down-enabled,omitempty"`
+	SpeedLimitUp              int64   `json:"speed-limit-up,omitempty"`
+	SpeedLimitUpEnabled       bool    `json:"speed-limit-up-enabled,omitempty"`
+	StartAddedTorrents        bool    `json:"start-added-torrents,omitempty"`
+	TrashOriginalTorrentFiles bool    `json:"trash-original-torrent-files,omitempty"`
+	UtpEnabled                bool    `json:"utp-enabled,omitempty"`
 }
 
-type Request struct {
-	Method    Method      `json:"method,omitempty"`
-	Arguments interface{} `json:"arguments,omitempty"`
-	Tag       int64       `json:"tag,omitempty"`
+type FreeSpace struct {
+	Path      string `json:"path"`
+	SizeBytes int64  `json:"size-bytes"`
+}
+
+type PortCheck struct {
+	PortIsOpen bool `json:"port-is-open"`
+}
+
+type Blocklist struct {
+	BlockListSize int64 `json:"blocklist-size"`
 }
 
 type Option func(*options)
@@ -282,16 +220,23 @@ func New(opts ...Option) *Client {
 	return &Client{options: defaults}
 }
 
-func (c *Client) fetch(request Request) (Response, error) {
-	var empty Response
+func fillStruct(base interface{}, target interface{}) error {
+	buf, err := json.Marshal(base)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(buf, target)
+}
+
+func (c *Client) fetch(request request) (*response, error) {
 	body, err := json.Marshal(&request)
 	if err != nil {
-		return empty, err
+		return nil, err
 	}
 
 	req, err := http.NewRequest(http.MethodPost, c.URL, bytes.NewBuffer(body))
 	if err != nil {
-		return empty, err
+		return nil, err
 	}
 
 	if c.Password != "" && c.Username != "" {
@@ -304,176 +249,203 @@ func (c *Client) fetch(request Request) (Response, error) {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return empty, err
+		return nil, err
 	}
 
+	var res response
 	if resp.StatusCode == http.StatusConflict {
 		c.sessionId = resp.Header.Get(SessionIdHeader)
-		return c.fetch(request)
+		if !request.AvoidRetry {
+			return c.fetch(request)
+		}
+		return &res, nil
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("invalid response from transmission service: %+v", resp.Status)
 	}
 
 	buf, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return empty, err
+		return nil, err
 	}
 
 	defer resp.Body.Close()
 
-	var response Response
-	if err := json.Unmarshal(buf, &response); err != nil {
-		return empty, err
-	}
-	return response, nil
-}
-
-func (c *Client) getAll(ids []int64, fields []string) ([]Torrent, error) {
-	var empty []Torrent
-	if len(fields) == 0 {
-		return empty, errors.New("request must includes at least one field")
+	if err := json.Unmarshal(buf, &res); err != nil {
+		return nil, err
 	}
 
-	response, err := c.fetch(Request{
-		Method:    MethodGet,
-		Arguments: RequestArgs{Ids: ids, Fields: fields},
-	})
-
-	if err != nil {
-		return empty, err
+	if res.Result != ResponseResultSuccess {
+		return nil, fmt.Errorf("failed to execute request: %s", res.Result)
 	}
-
-	if response.Result == ResponseResultError {
-		return empty, errors.New("unable to get results from transmission service")
-	}
-
-	return response.Args.Torrents, nil
+	return &res, nil
 }
 
 func (c *Client) Ping() error {
-	_, err := c.fetch(Request{})
+	_, err := c.fetch(request{Method: "ping", AvoidRetry: true})
 	return err
 }
 
-func (c *Client) Get(id int64, fields []string) (Torrent, error) {
-	var empty Torrent
-	if len(fields) == 0 {
-		return empty, errors.New("request must includes at least one field")
-	}
-
-	torrents, err := c.getAll([]int64{id}, fields)
-	if err != nil {
-		return empty, err
-	}
-
-	if len(torrents) == 1 {
-		return torrents[0], nil
-	}
-
-	return empty, errors.New("torrent not found")
-}
-
-func (c *Client) GetAll(ids []int64, fields []string) ([]Torrent, error) {
-	return c.getAll(ids, fields)
-}
-
-// Torrent actions
-func (c *Client) performAction(ids []int64, method Method) error {
-	resp, err := c.fetch(Request{
-		Method:    method,
-		Arguments: RequestArgs{Ids: ids},
-	})
-
-	if err != nil {
-		return err
-	}
-
-	if resp.Result == ResponseResultError {
-		return errors.New("could not perform action")
-	}
-	return nil
-}
-
-func (c *Client) Start(id int64) error {
-	return c.performAction([]int64{id}, MethodStart)
-}
-
-func (c *Client) StartAll(ids []int64) error {
-	return c.performAction(ids, MethodStart)
-}
-
-func (c *Client) StartNow(id int64) error {
-	return c.performAction([]int64{id}, MethodStartNow)
-}
-
-func (c *Client) StartAllNow(ids []int64) error {
-	return c.performAction(ids, MethodStartNow)
-}
-
-func (c *Client) Stop(id int64) error {
-	return c.performAction([]int64{id}, MethodStop)
-}
-
-func (c *Client) StopAll(ids []int64) error {
-	return c.performAction(ids, MethodStop)
-}
-
-func (c *Client) Verify(id int64) error {
-	return c.performAction([]int64{id}, MethodVerify)
-}
-
-func (c *Client) VerifyAll(ids []int64) error {
-	return c.performAction(ids, MethodVerify)
-}
-
-func (c *Client) Reannounce(id int64) error {
-	return c.performAction([]int64{id}, MethodReannounce)
-}
-
-func (c *Client) ReannounceAll(ids []int64) error {
-	return c.performAction(ids, MethodReannounce)
-}
-
-// Torrent mutators
-
-// Add torrent
-func (c *Client) Add(args AddPayload) (Torrent, error) {
-	var empty Torrent
-	resp, err := c.fetch(Request{
-		Method:    MethodAdd,
-		Arguments: args,
-	})
-	if err != nil {
-		return empty, err
-	}
-	return resp.Args.TorrentAdded, nil
-}
-
-// Remove torrent
-func (c *Client) Remove(args RemovePayload) error {
-	_, err := c.fetch(Request{
-		Method:    MethodRemove,
-		Arguments: args,
-	})
+func (c *Client) TorrentStart(args TorrentAction) error {
+	_, err := c.fetch(request{Method: MethodTorrentStart, Arguments: args})
 	return err
 }
 
-func (c *Client) Rename(args RenamePayload) (Torrent, error) {
+func (c *Client) TorrentStartNow(args TorrentAction) error {
+	_, err := c.fetch(request{Method: MethodTorrentStartNow, Arguments: args})
+	return err
+}
+
+func (c *Client) TorrentStop(args TorrentAction) error {
+	_, err := c.fetch(request{Method: MethodTorrentStop, Arguments: args})
+	return err
+}
+
+func (c *Client) TorrentVerify(args TorrentAction) error {
+	_, err := c.fetch(request{Method: MethodTorrentVerify, Arguments: args})
+	return err
+}
+
+func (c *Client) TorrentReannounce(args TorrentAction) error {
+	_, err := c.fetch(request{Method: MethodTorrentReannounce, Arguments: args})
+	return err
+}
+
+func (c *Client) TorrentGet(args TorrentGet) ([]Torrent, error) {
+	var torrents []Torrent
+	response, err := c.fetch(request{Method: MethodTorrentGet, Arguments: args})
+
+	if err != nil {
+		return torrents, err
+	}
+
+	list, ok := response.Args["torrents"]
+	if !ok {
+		return torrents, nil
+	}
+
+	err = fillStruct(list, &torrents)
+	return torrents, nil
+}
+
+func (c *Client) TorrentRename(args TorrentRename) (Torrent, error) {
 	var torrent Torrent
-	if len(args.Ids) > 1 {
-		return torrent, errors.New("could not edit multiple torrents at the same time")
-	}
-
-	resp, err := c.fetch(Request{
-		Method:    MethodRename,
-		Arguments: args,
-	})
+	resp, err := c.fetch(request{Method: MethodTorrentRename, Arguments: args})
 
 	if err != nil {
 		return torrent, err
 	}
+	err = fillStruct(resp.Args, &torrent)
+	return torrent, err
+}
 
-	torrent.Id = resp.Args.Id
-	torrent.Name = resp.Args.Name
-	torrent.Path = resp.Args.Path
+func (c *Client) TorrentSet(args TorrentSet) error {
+	_, err := c.fetch(request{Method: MethodTorrentSet, Arguments: args})
+	return err
+}
 
+func (c *Client) TorrentAdd(args TorrentAdd) (Torrent, error) {
+	var torrent Torrent
+	resp, err := c.fetch(request{Method: MethodTorrentAdd, Arguments: args})
+	if err != nil {
+		return torrent, err
+	}
+	added, ok := resp.Args["torrent-added"]
+	if !ok {
+		return torrent, nil
+	}
+
+	err = fillStruct(added, &torrent)
 	return torrent, nil
+}
+
+func (c *Client) TorrentRemove(args TorrentRemove) error {
+	_, err := c.fetch(request{Method: MethodTorrentRemove, Arguments: args})
+	return err
+}
+
+func (c *Client) TorrentMove(args TorrentMove) error {
+	_, err := c.fetch(request{Method: MethodTorrentMove, Arguments: args})
+	return err
+}
+
+func (c *Client) SessionSet(args SessionSet) error {
+	_, err := c.fetch(request{Method: MethodSessionSet, Arguments: args})
+	return err
+}
+
+func (c *Client) SessionGet(args SessionGet) (Session, error) {
+	var session Session
+	resp, err := c.fetch(request{Method: MethodSessionGet, Arguments: args})
+	if err != nil {
+		return session, err
+	}
+	err = fillStruct(resp.Args, &session)
+	return session, err
+}
+
+func (c *Client) SessionStats() (SessionStats, error) {
+	var stats SessionStats
+	resp, err := c.fetch(request{Method: MethodSessionStats})
+	if err != nil {
+		return stats, err
+	}
+	err = fillStruct(resp.Args, &stats)
+	return stats, err
+}
+
+func (c *Client) SessionClose() error {
+	_, err := c.fetch(request{Method: MethodSessionClose})
+	return err
+}
+
+func (c *Client) QueueMoveTop(args QueueMovement) error {
+	_, err := c.fetch(request{Method: MethodQueueTop, Arguments: args})
+	return err
+}
+
+func (c *Client) QueueMoveBottom(args QueueMovement) error {
+	_, err := c.fetch(request{Method: MethodQueueBottom, Arguments: args})
+	return err
+}
+
+func (c *Client) QueueMoveUp(args QueueMovement) error {
+	_, err := c.fetch(request{Method: MethodQueueUp, Arguments: args})
+	return err
+}
+
+func (c *Client) QueueMoveDown(args QueueMovement) error {
+	_, err := c.fetch(request{Method: MethodQueueDown, Arguments: args})
+	return err
+}
+
+func (c *Client) FreeSpace(args FreeSpace) (FreeSpace, error) {
+	var free FreeSpace
+	resp, err := c.fetch(request{Method: "free-space", Arguments: args})
+	if err != nil {
+		return free, err
+	}
+	err = fillStruct(resp.Args, &free)
+	return free, err
+}
+
+func (c *Client) PortCheck() (PortCheck, error) {
+	var port PortCheck
+	resp, err := c.fetch(request{Method: "port-test"})
+	if err != nil {
+		return port, err
+	}
+	err = fillStruct(resp.Args, &port)
+	return port, err
+}
+
+func (c *Client) BlockListUpdate() (BlockList, error) {
+	var blockList BlockList
+	resp, err := c.fetch(request{Method: "blocklist-update"})
+	if err != nil {
+		return blockList, err
+	}
+	err = fillStruct(resp.Args, &blockList)
+	return blockList, err
 }
