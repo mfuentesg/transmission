@@ -33,6 +33,10 @@ const (
 	MethodQueueDown   Method = "queue-move-down"
 	MethodQueueBottom Method = "queue-move-bottom"
 
+	MethodFreeSpace       Method = "free-space"
+	MethodPortTest        Method = "port-test"
+	MethodBlockListUpdate Method = "blocklist-update"
+
 	ResponseResultSuccess = "success"
 	SessionIdHeader       = "X-Transmission-Session-Id"
 )
@@ -283,6 +287,7 @@ func (c *Client) fetch(request request) (*response, error) {
 }
 
 func (c *Client) Ping() error {
+	// this is just a hack to retrieve a valid session id token
 	_, err := c.fetch(request{Method: "ping", AvoidRetry: true})
 	return err
 }
@@ -422,7 +427,7 @@ func (c *Client) QueueMoveDown(args QueueMovement) error {
 
 func (c *Client) FreeSpace(args FreeSpace) (FreeSpace, error) {
 	var free FreeSpace
-	resp, err := c.fetch(request{Method: "free-space", Arguments: args})
+	resp, err := c.fetch(request{Method: MethodFreeSpace, Arguments: args})
 	if err != nil {
 		return free, err
 	}
@@ -432,7 +437,7 @@ func (c *Client) FreeSpace(args FreeSpace) (FreeSpace, error) {
 
 func (c *Client) PortCheck() (PortCheck, error) {
 	var port PortCheck
-	resp, err := c.fetch(request{Method: "port-test"})
+	resp, err := c.fetch(request{Method: MethodPortTest})
 	if err != nil {
 		return port, err
 	}
@@ -442,7 +447,7 @@ func (c *Client) PortCheck() (PortCheck, error) {
 
 func (c *Client) BlockListUpdate() (BlockList, error) {
 	var blockList BlockList
-	resp, err := c.fetch(request{Method: "blocklist-update"})
+	resp, err := c.fetch(request{Method: MethodBlockListUpdate})
 	if err != nil {
 		return blockList, err
 	}
