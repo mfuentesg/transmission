@@ -25,7 +25,7 @@ This repository it's a wrapper for [`transmission RPC API`](https://github.com/t
 - [x] queue-move-bottom
 - [x] free-space
 - [x] port-test
-- [x] blocklist-update 
+- [x] blocklist-update
 
 For more information read [spec file](https://github.com/transmission/transmission/blob/master/extras/rpc-spec.txt).
 
@@ -43,6 +43,7 @@ go get -u github.com/mfuentesg/transmission
 package main
 
 import (
+    "context"
     "log"
 
     "github.com/mfuentesg/transmission"
@@ -55,7 +56,7 @@ func main() {
 	)
 
     // this method is not part of the spec (just check connectivity)
-    if err := client.Ping(); err != nil {
+    if err := client.Ping(context.Background()); err != nil {
         log.Fatalf("could not connect to transmission service: %+v", err)
     }
 
@@ -68,6 +69,7 @@ func main() {
 package main
 
 import (
+    "context"
     "fmt"
     "log"
 
@@ -81,9 +83,9 @@ func main() {
 	)
 
     // get list of torrents
-    // For fields:
-    //  Check this https://github.com/transmission/transmission/blob/20119f006ca0f3a13245b379c74254c92f372910/extras/rpc-spec.txt#L111
-    torrents, err := client.TorrentGet(transmission.TorrentGet{
+    // For know more about the available fields, take a look to the below link
+    // https://github.com/transmission/transmission/blob/20119f006ca0f3a13245b379c74254c92f372910/extras/rpc-spec.txt#L111
+    torrents, err := client.TorrentGet(context.Background(), transmission.TorrentGet{
         Ids: 17, // search by id, you can use hashString as well
         Fields: []string{"id", "hashString"},
     })

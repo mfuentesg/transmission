@@ -2,6 +2,7 @@ package transmission
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -190,38 +191,41 @@ type BlockList struct {
 	BlockListSize int64 `json:"blocklist-size"`
 }
 
-type Option func(*options)
+type Option func(*Client)
 
 type Client struct {
-	options
-}
-
-type options struct {
-	Username  string
-	Password  string
-	URL       string
-	sessionId string
+	Username   string
+	Password   string
+	URL        string
+	SessionId  string
+	HttpClient http.Client
 }
 
 func WithURL(url string) Option {
-	return func(o *options) {
-		o.URL = url
+	return func(c *Client) {
+		c.URL = url
 	}
 }
 
 func WithBasicAuth(user, password string) Option {
-	return func(o *options) {
-		o.Username = user
-		o.Password = password
+	return func(c *Client) {
+		c.Username = user
+		c.Password = password
+	}
+}
+
+func WithHttpClient(client http.Client) Option {
+	return func(c *Client) {
+		c.HttpClient = client
 	}
 }
 
 func New(opts ...Option) *Client {
-	defaults := options{}
+	client := Client{HttpClient: http.Client{}}
 	for _, o := range opts {
-		o(&defaults)
+		o(&client)
 	}
-	return &Client{options: defaults}
+	return &client
 }
 
 func fillStruct(base interface{}, target interface{}) error {
@@ -232,7 +236,7 @@ func fillStruct(base interface{}, target interface{}) error {
 	return json.Unmarshal(buf, target)
 }
 
-func (c *Client) fetch(request request) (*response, error) {
+func (c *Client) fetch(ctx context.Context, request request) (*response, error) {
 	body, err := json.Marshal(&request)
 	if err != nil {
 		return nil, err
@@ -249,7 +253,7 @@ func (c *Client) fetch(request request) (*response, error) {
 
 	req.Header.Set("User-Agent", "transmission")
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set(SessionIdHeader, c.sessionId)
+	req.Header.Set(SessionIdHeader, c.SessionId)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -258,9 +262,9 @@ func (c *Client) fetch(request request) (*response, error) {
 
 	var res response
 	if resp.StatusCode == http.StatusConflict {
-		c.sessionId = resp.Header.Get(SessionIdHeader)
+		c.SessionId = resp.Header.Get(SessionIdHeader)
 		if !request.AvoidRetry {
-			return c.fetch(request)
+			return c.fetch(ctx, request)
 		}
 		return &res, nil
 	}
@@ -286,40 +290,40 @@ func (c *Client) fetch(request request) (*response, error) {
 	return &res, nil
 }
 
-func (c *Client) Ping() error {
+func (c *Client) Ping(ctx context.Context) error {
 	// this is just a hack to retrieve a valid session id token
-	_, err := c.fetch(request{Method: "ping", AvoidRetry: true})
+	_, err := c.fetch(ctx, request{Method: "ping", AvoidRetry: true})
 	return err
 }
 
-func (c *Client) TorrentStart(args TorrentAction) error {
-	_, err := c.fetch(request{Method: MethodTorrentStart, Arguments: args})
+func (c *Client) TorrentStart(ctx context.Context, args TorrentAction) error {
+	_, err := c.fetch(ctx, request{Method: MethodTorrentStart, Arguments: args})
 	return err
 }
 
-func (c *Client) TorrentStartNow(args TorrentAction) error {
-	_, err := c.fetch(request{Method: MethodTorrentStartNow, Arguments: args})
+func (c *Client) TorrentStartNow(ctx context.Context, args TorrentAction) error {
+	_, err := c.fetch(ctx, request{Method: MethodTorrentStartNow, Arguments: args})
 	return err
 }
 
-func (c *Client) TorrentStop(args TorrentAction) error {
-	_, err := c.fetch(request{Method: MethodTorrentStop, Arguments: args})
+func (c *Client) TorrentStop(ctx context.Context, args TorrentAction) error {
+	_, err := c.fetch(ctx, request{Method: MethodTorrentStop, Arguments: args})
 	return err
 }
 
-func (c *Client) TorrentVerify(args TorrentAction) error {
-	_, err := c.fetch(request{Method: MethodTorrentVerify, Arguments: args})
+func (c *Client) TorrentVerify(ctx context.Context, args TorrentAction) error {
+	_, err := c.fetch(ctx, request{Method: MethodTorrentVerify, Arguments: args})
 	return err
 }
 
-func (c *Client) TorrentReannounce(args TorrentAction) error {
-	_, err := c.fetch(request{Method: MethodTorrentReannounce, Arguments: args})
+func (c *Client) TorrentReannounce(ctx context.Context, args TorrentAction) error {
+	_, err := c.fetch(ctx, request{Method: MethodTorrentReannounce, Arguments: args})
 	return err
 }
 
-func (c *Client) TorrentGet(args TorrentGet) ([]Torrent, error) {
+func (c *Client) TorrentGet(ctx context.Context, args TorrentGet) ([]Torrent, error) {
 	var torrents []Torrent
-	response, err := c.fetch(request{Method: MethodTorrentGet, Arguments: args})
+	response, err := c.fetch(ctx, request{Method: MethodTorrentGet, Arguments: args})
 
 	if err != nil {
 		return torrents, err
@@ -334,9 +338,9 @@ func (c *Client) TorrentGet(args TorrentGet) ([]Torrent, error) {
 	return torrents, nil
 }
 
-func (c *Client) TorrentRename(args TorrentRename) (Torrent, error) {
+func (c *Client) TorrentRename(ctx context.Context, args TorrentRename) (Torrent, error) {
 	var torrent Torrent
-	resp, err := c.fetch(request{Method: MethodTorrentRename, Arguments: args})
+	resp, err := c.fetch(ctx, request{Method: MethodTorrentRename, Arguments: args})
 
 	if err != nil {
 		return torrent, err
@@ -345,14 +349,14 @@ func (c *Client) TorrentRename(args TorrentRename) (Torrent, error) {
 	return torrent, err
 }
 
-func (c *Client) TorrentSet(args TorrentSet) error {
-	_, err := c.fetch(request{Method: MethodTorrentSet, Arguments: args})
+func (c *Client) TorrentSet(ctx context.Context, args TorrentSet) error {
+	_, err := c.fetch(ctx, request{Method: MethodTorrentSet, Arguments: args})
 	return err
 }
 
-func (c *Client) TorrentAdd(args TorrentAdd) (Torrent, error) {
+func (c *Client) TorrentAdd(ctx context.Context, args TorrentAdd) (Torrent, error) {
 	var torrent Torrent
-	resp, err := c.fetch(request{Method: MethodTorrentAdd, Arguments: args})
+	resp, err := c.fetch(ctx, request{Method: MethodTorrentAdd, Arguments: args})
 	if err != nil {
 		return torrent, err
 	}
@@ -365,24 +369,24 @@ func (c *Client) TorrentAdd(args TorrentAdd) (Torrent, error) {
 	return torrent, nil
 }
 
-func (c *Client) TorrentRemove(args TorrentRemove) error {
-	_, err := c.fetch(request{Method: MethodTorrentRemove, Arguments: args})
+func (c *Client) TorrentRemove(ctx context.Context, args TorrentRemove) error {
+	_, err := c.fetch(ctx, request{Method: MethodTorrentRemove, Arguments: args})
 	return err
 }
 
-func (c *Client) TorrentMove(args TorrentMove) error {
-	_, err := c.fetch(request{Method: MethodTorrentMove, Arguments: args})
+func (c *Client) TorrentMove(ctx context.Context, args TorrentMove) error {
+	_, err := c.fetch(ctx, request{Method: MethodTorrentMove, Arguments: args})
 	return err
 }
 
-func (c *Client) SessionSet(args SessionSet) error {
-	_, err := c.fetch(request{Method: MethodSessionSet, Arguments: args})
+func (c *Client) SessionSet(ctx context.Context, args SessionSet) error {
+	_, err := c.fetch(ctx, request{Method: MethodSessionSet, Arguments: args})
 	return err
 }
 
-func (c *Client) SessionGet(args SessionGet) (Session, error) {
+func (c *Client) SessionGet(ctx context.Context, args SessionGet) (Session, error) {
 	var session Session
-	resp, err := c.fetch(request{Method: MethodSessionGet, Arguments: args})
+	resp, err := c.fetch(ctx, request{Method: MethodSessionGet, Arguments: args})
 	if err != nil {
 		return session, err
 	}
@@ -390,9 +394,9 @@ func (c *Client) SessionGet(args SessionGet) (Session, error) {
 	return session, err
 }
 
-func (c *Client) SessionStats() (SessionStats, error) {
+func (c *Client) SessionStats(ctx context.Context) (SessionStats, error) {
 	var stats SessionStats
-	resp, err := c.fetch(request{Method: MethodSessionStats})
+	resp, err := c.fetch(ctx, request{Method: MethodSessionStats})
 	if err != nil {
 		return stats, err
 	}
@@ -400,34 +404,34 @@ func (c *Client) SessionStats() (SessionStats, error) {
 	return stats, err
 }
 
-func (c *Client) SessionClose() error {
-	_, err := c.fetch(request{Method: MethodSessionClose})
+func (c *Client) SessionClose(ctx context.Context) error {
+	_, err := c.fetch(ctx, request{Method: MethodSessionClose})
 	return err
 }
 
-func (c *Client) QueueMoveTop(args QueueMovement) error {
-	_, err := c.fetch(request{Method: MethodQueueTop, Arguments: args})
+func (c *Client) QueueMoveTop(ctx context.Context, args QueueMovement) error {
+	_, err := c.fetch(ctx, request{Method: MethodQueueTop, Arguments: args})
 	return err
 }
 
-func (c *Client) QueueMoveBottom(args QueueMovement) error {
-	_, err := c.fetch(request{Method: MethodQueueBottom, Arguments: args})
+func (c *Client) QueueMoveBottom(ctx context.Context, args QueueMovement) error {
+	_, err := c.fetch(ctx, request{Method: MethodQueueBottom, Arguments: args})
 	return err
 }
 
-func (c *Client) QueueMoveUp(args QueueMovement) error {
-	_, err := c.fetch(request{Method: MethodQueueUp, Arguments: args})
+func (c *Client) QueueMoveUp(ctx context.Context, args QueueMovement) error {
+	_, err := c.fetch(ctx, request{Method: MethodQueueUp, Arguments: args})
 	return err
 }
 
-func (c *Client) QueueMoveDown(args QueueMovement) error {
-	_, err := c.fetch(request{Method: MethodQueueDown, Arguments: args})
+func (c *Client) QueueMoveDown(ctx context.Context, args QueueMovement) error {
+	_, err := c.fetch(ctx, request{Method: MethodQueueDown, Arguments: args})
 	return err
 }
 
-func (c *Client) FreeSpace(args FreeSpace) (FreeSpace, error) {
+func (c *Client) FreeSpace(ctx context.Context, args FreeSpace) (FreeSpace, error) {
 	var free FreeSpace
-	resp, err := c.fetch(request{Method: MethodFreeSpace, Arguments: args})
+	resp, err := c.fetch(ctx, request{Method: MethodFreeSpace, Arguments: args})
 	if err != nil {
 		return free, err
 	}
@@ -435,9 +439,9 @@ func (c *Client) FreeSpace(args FreeSpace) (FreeSpace, error) {
 	return free, err
 }
 
-func (c *Client) PortCheck() (PortCheck, error) {
+func (c *Client) PortCheck(ctx context.Context) (PortCheck, error) {
 	var port PortCheck
-	resp, err := c.fetch(request{Method: MethodPortTest})
+	resp, err := c.fetch(ctx, request{Method: MethodPortTest})
 	if err != nil {
 		return port, err
 	}
@@ -445,9 +449,9 @@ func (c *Client) PortCheck() (PortCheck, error) {
 	return port, err
 }
 
-func (c *Client) BlockListUpdate() (BlockList, error) {
+func (c *Client) BlockListUpdate(ctx context.Context) (BlockList, error) {
 	var blockList BlockList
-	resp, err := c.fetch(request{Method: MethodBlockListUpdate})
+	resp, err := c.fetch(ctx, request{Method: MethodBlockListUpdate})
 	if err != nil {
 		return blockList, err
 	}
