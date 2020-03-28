@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -40,6 +41,10 @@ const (
 
 	ResponseResultSuccess = "success"
 	SessionIdHeader       = "X-Transmission-Session-Id"
+)
+
+var (
+	ErrInvalidSessionId = errors.New("invalid session-id header")
 )
 
 type response struct {
@@ -198,7 +203,7 @@ type Client struct {
 	Password   string
 	URL        string
 	SessionId  string
-	HttpClient http.Client
+	HttpClient *http.Client
 }
 
 func WithURL(url string) Option {
@@ -214,14 +219,14 @@ func WithBasicAuth(user, password string) Option {
 	}
 }
 
-func WithHttpClient(client http.Client) Option {
+func WithHttpClient(client *http.Client) Option {
 	return func(c *Client) {
 		c.HttpClient = client
 	}
 }
 
 func New(opts ...Option) *Client {
-	client := Client{HttpClient: http.Client{}}
+	client := Client{HttpClient: &http.Client{}}
 	for _, o := range opts {
 		o(&client)
 	}
@@ -242,7 +247,7 @@ func (c *Client) fetch(ctx context.Context, request request) (*response, error) 
 		return nil, err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, c.URL, bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.URL, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err
 	}
@@ -250,12 +255,11 @@ func (c *Client) fetch(ctx context.Context, request request) (*response, error) 
 	if c.Password != "" && c.Username != "" {
 		req.SetBasicAuth(c.Username, c.Password)
 	}
-
 	req.Header.Set("User-Agent", "transmission")
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(SessionIdHeader, c.SessionId)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := c.HttpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +270,7 @@ func (c *Client) fetch(ctx context.Context, request request) (*response, error) 
 		if !request.AvoidRetry {
 			return c.fetch(ctx, request)
 		}
-		return &res, nil
+		return nil, ErrInvalidSessionId
 	}
 
 	if resp.StatusCode != http.StatusOK {
