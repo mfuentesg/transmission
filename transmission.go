@@ -48,16 +48,16 @@ var (
 )
 
 type response struct {
-	Result string                 `json:"result,omitempty"`
-	Args   map[string]interface{} `json:"arguments,omitempty"`
-	Tag    int64                  `json:"tag"`
+	Result    string                 `json:"result,omitempty"`    // string whose value MUST be "success" on success, or an error string on failure
+	Arguments map[string]interface{} `json:"arguments,omitempty"` // object of key/value pairs
+	Tag       int64                  `json:"tag,omitempty"`       // number used by clients to track responses
 }
 
 type request struct {
-	Method     Method      `json:"method,omitempty"`
-	Arguments  interface{} `json:"arguments,omitempty"`
-	Tag        int64       `json:"tag"`
-	AvoidRetry bool        `json:"-"`
+	Method     Method      `json:"method,omitempty"`    // string telling the name of the method to invoke
+	Arguments  interface{} `json:"arguments,omitempty"` // object of key/value pairs
+	Tag        int64       `json:"tag,omitempty"`       // number used by clients to track responses (same request tag value)
+	AvoidRetry bool        `json:"-"`                   // used internally to avoid retries when token is invalid/expired
 }
 
 type TorrentAction struct {
@@ -249,7 +249,7 @@ func (c *Client) fetch(ctx context.Context, request request) (*response, error) 
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.URL, bytes.NewBuffer(body))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create request with context: %+v", err)
 	}
 
 	if c.Password != "" && c.Username != "" {
@@ -261,10 +261,9 @@ func (c *Client) fetch(ctx context.Context, request request) (*response, error) 
 
 	resp, err := c.HttpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("expected error sending http request: %+v", err)
 	}
 
-	var res response
 	if resp.StatusCode == http.StatusConflict {
 		c.SessionId = resp.Header.Get(SessionIdHeader)
 		if !request.AvoidRetry {
@@ -273,17 +272,13 @@ func (c *Client) fetch(ctx context.Context, request request) (*response, error) 
 		return nil, ErrInvalidSessionId
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("invalid response from transmission service: %+v", resp.Status)
-	}
-
 	buf, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 
 	defer resp.Body.Close()
-
+	var res response
 	if err := json.Unmarshal(buf, &res); err != nil {
 		return nil, err
 	}
@@ -297,6 +292,9 @@ func (c *Client) fetch(ctx context.Context, request request) (*response, error) 
 func (c *Client) Ping(ctx context.Context) error {
 	// this is just a hack to retrieve a valid session id token
 	_, err := c.fetch(ctx, request{Method: "ping", AvoidRetry: true})
+	if errors.Is(err, ErrInvalidSessionId) {
+		return nil
+	}
 	return err
 }
 
@@ -333,7 +331,7 @@ func (c *Client) TorrentGet(ctx context.Context, args TorrentGet) ([]Torrent, er
 		return torrents, err
 	}
 
-	list, ok := response.Args["torrents"]
+	list, ok := response.Arguments["torrents"]
 	if !ok {
 		return torrents, nil
 	}
@@ -349,7 +347,7 @@ func (c *Client) TorrentRename(ctx context.Context, args TorrentRename) (Torrent
 	if err != nil {
 		return torrent, err
 	}
-	err = fillStruct(resp.Args, &torrent)
+	err = fillStruct(resp.Arguments, &torrent)
 	return torrent, err
 }
 
@@ -364,7 +362,7 @@ func (c *Client) TorrentAdd(ctx context.Context, args TorrentAdd) (Torrent, erro
 	if err != nil {
 		return torrent, err
 	}
-	added, ok := resp.Args["torrent-added"]
+	added, ok := resp.Arguments["torrent-added"]
 	if !ok {
 		return torrent, nil
 	}
@@ -394,7 +392,7 @@ func (c *Client) SessionGet(ctx context.Context, args SessionGet) (Session, erro
 	if err != nil {
 		return session, err
 	}
-	err = fillStruct(resp.Args, &session)
+	err = fillStruct(resp.Arguments, &session)
 	return session, err
 }
 
@@ -404,7 +402,7 @@ func (c *Client) SessionStats(ctx context.Context) (SessionStats, error) {
 	if err != nil {
 		return stats, err
 	}
-	err = fillStruct(resp.Args, &stats)
+	err = fillStruct(resp.Arguments, &stats)
 	return stats, err
 }
 
@@ -439,7 +437,7 @@ func (c *Client) FreeSpace(ctx context.Context, args FreeSpace) (FreeSpace, erro
 	if err != nil {
 		return free, err
 	}
-	err = fillStruct(resp.Args, &free)
+	err = fillStruct(resp.Arguments, &free)
 	return free, err
 }
 
@@ -449,7 +447,7 @@ func (c *Client) PortCheck(ctx context.Context) (PortCheck, error) {
 	if err != nil {
 		return port, err
 	}
-	err = fillStruct(resp.Args, &port)
+	err = fillStruct(resp.Arguments, &port)
 	return port, err
 }
 
@@ -459,6 +457,6 @@ func (c *Client) BlockListUpdate(ctx context.Context) (BlockList, error) {
 	if err != nil {
 		return blockList, err
 	}
-	err = fillStruct(resp.Args, &blockList)
+	err = fillStruct(resp.Arguments, &blockList)
 	return blockList, err
 }
