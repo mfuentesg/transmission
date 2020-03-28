@@ -113,7 +113,7 @@ type Torrent struct {
 	MaxConnectedPeers       int64         `json:"maxConnectedPeers,omitempty"`
 	MetadataPercentComplete float64       `json:"metadataPercentComplete,omitempty"`
 	Name                    string        `json:"name,omitempty"`
-	Path                    string        `json:"path,omitempty"` // Used
+	Path                    string        `json:"path,omitempty"` // This field is not part of the standard response
 	PeerLimit               int64         `json:"peer-limit,omitempty"`
 	Peers                   []Peer        `json:"peers,omitempty"`
 	PeersConnected          int64         `json:"peersConnected,omitempty"`
