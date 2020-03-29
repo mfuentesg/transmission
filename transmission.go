@@ -41,6 +41,8 @@ const (
 
 	ResponseResultSuccess = "success"
 	SessionIdHeader       = "X-Transmission-Session-Id"
+
+	MaxRetries = 2
 )
 
 var (
@@ -57,7 +59,7 @@ type request struct {
 	Method     Method      `json:"method,omitempty"`    // string telling the name of the method to invoke
 	Arguments  interface{} `json:"arguments,omitempty"` // object of key/value pairs
 	Tag        int64       `json:"tag,omitempty"`       // number used by clients to track responses (same request tag value)
-	AvoidRetry bool        `json:"-"`                   // used internally to avoid retries when token is invalid/expired
+	MaxRetries int         `json:"-"`                   // used internally to avoid retries when token is invalid/expired
 }
 
 type TorrentAction struct {
@@ -221,7 +223,11 @@ func WithBasicAuth(user, password string) Option {
 
 func WithHttpClient(client *http.Client) Option {
 	return func(c *Client) {
-		c.HttpClient = client
+		if client != nil {
+			c.HttpClient = client
+		} else {
+			c.HttpClient = &http.Client{}
+		}
 	}
 }
 
@@ -239,6 +245,20 @@ func fillStruct(base interface{}, target interface{}) error {
 		return err
 	}
 	return json.Unmarshal(buf, target)
+}
+
+func (c *Client) doRequest(request *http.Request, maxRetries int) (*http.Response, error) {
+	resp, err := c.HttpClient.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected error sending http request: %+v", err)
+	}
+	if resp.StatusCode == http.StatusConflict {
+		if maxRetries-1 <= 0 {
+			return nil, ErrInvalidSessionId
+		}
+		return c.doRequest(request, maxRetries-1)
+	}
+	return resp, nil
 }
 
 func (c *Client) fetch(ctx context.Context, request request) (*response, error) {
@@ -259,17 +279,13 @@ func (c *Client) fetch(ctx context.Context, request request) (*response, error) 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(SessionIdHeader, c.SessionId)
 
-	resp, err := c.HttpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("expected error sending http request: %+v", err)
+	maxRetries := request.MaxRetries
+	if request.MaxRetries <= 0 {
+		maxRetries = MaxRetries
 	}
-
-	if resp.StatusCode == http.StatusConflict {
-		c.SessionId = resp.Header.Get(SessionIdHeader)
-		if !request.AvoidRetry {
-			return c.fetch(ctx, request)
-		}
-		return nil, ErrInvalidSessionId
+	resp, err := c.doRequest(req, maxRetries)
+	if err != nil {
+		return nil, err
 	}
 
 	buf, err := ioutil.ReadAll(resp.Body)
@@ -284,14 +300,14 @@ func (c *Client) fetch(ctx context.Context, request request) (*response, error) 
 	}
 
 	if res.Result != ResponseResultSuccess {
-		return nil, fmt.Errorf("failed to execute request: %s", res.Result)
+		return nil, fmt.Errorf("unexpected result: %s", res.Result)
 	}
 	return &res, nil
 }
 
 func (c *Client) Ping(ctx context.Context) error {
 	// this is just a hack to retrieve a valid session id token
-	_, err := c.fetch(ctx, request{Method: "ping", AvoidRetry: true})
+	_, err := c.fetch(ctx, request{Method: "ping", MaxRetries: 1})
 	if errors.Is(err, ErrInvalidSessionId) {
 		return nil
 	}

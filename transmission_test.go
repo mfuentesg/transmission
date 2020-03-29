@@ -2,6 +2,7 @@ package transmission
 
 import (
 	"context"
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -26,14 +27,20 @@ func TestWithBasicAuth(t *testing.T) {
 }
 
 func TestWithHttpClient(t *testing.T) {
-	var (
-		client     Client
-		httpClient = &http.Client{
+	var client Client
+
+	t.Run("should assign set default http client with an invalid parameter", func(st *testing.T) {
+		WithHttpClient(nil)(&client)
+		assert.NotNil(st, client.HttpClient)
+	})
+
+	t.Run("should assign valid http client", func(st *testing.T) {
+		httpClient := &http.Client{
 			Timeout: 15000,
 		}
-	)
-	WithHttpClient(httpClient)(&client)
-	assert.Equal(t, httpClient.Timeout, client.HttpClient.Timeout)
+		WithHttpClient(httpClient)(&client)
+		assert.Equal(st, httpClient.Timeout, client.HttpClient.Timeout)
+	})
 }
 
 func TestNew(t *testing.T) {
@@ -473,7 +480,144 @@ func BenchmarkFillStruct(b *testing.B) {
 	}
 }
 
-func TestFetch(t *testing.T) {}
+func TestFetch(t *testing.T) {
+	t.Run("should return an error for invalid marshal", func(st *testing.T) {
+		client := New()
+		res, err := client.fetch(context.Background(), request{
+			Arguments: make(chan bool),
+		})
+		assert.Nil(t, res)
+		assert.NotNil(t, err)
+		assert.Error(t, err)
+	})
+
+	t.Run("should return an error with context nil", func(st *testing.T) {
+		client := New()
+		res, err := client.fetch(nil, request{
+			Arguments: map[string]interface{}{},
+		})
+		assert.Nil(t, res)
+		assert.NotNil(t, err)
+		assert.Error(t, err)
+	})
+
+	t.Run("should return an error trying to execute request without valid url", func(st *testing.T) {
+		client := New()
+		res, err := client.fetch(context.Background(), request{})
+		assert.Nil(t, res)
+		assert.NotNil(t, err)
+		assert.Error(t, err)
+	})
+
+	t.Run("should return an error an invalid body response", func(st *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<>`))
+		}
+		s := httptest.NewServer(http.HandlerFunc(handler))
+		client := New(WithURL(s.URL), WithHttpClient(s.Client()))
+		res, err := client.fetch(context.Background(), request{})
+		assert.Nil(t, res)
+		assert.NotNil(t, err)
+		assert.Error(t, err)
+	})
+
+	t.Run("should not add authorization header if username is empty", func(st *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, r.Header.Get("authorization"), "")
+		}
+		s := httptest.NewServer(http.HandlerFunc(handler))
+		client := New(
+			WithURL(s.URL),
+			WithHttpClient(s.Client()),
+			WithBasicAuth("", "secret"),
+		)
+		_, _ = client.fetch(context.Background(), request{})
+	})
+
+	t.Run("should not add authorization header if password is empty", func(st *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, r.Header.Get("authorization"), "")
+		}
+		s := httptest.NewServer(http.HandlerFunc(handler))
+		client := New(
+			WithURL(s.URL),
+			WithHttpClient(s.Client()),
+			WithBasicAuth("username", ""),
+		)
+		_, _ = client.fetch(context.Background(), request{})
+	})
+
+	t.Run("should not add authorization header if username and password are empty", func(st *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, r.Header.Get("authorization"), "")
+		}
+		s := httptest.NewServer(http.HandlerFunc(handler))
+		client := New(
+			WithURL(s.URL),
+			WithHttpClient(s.Client()),
+		)
+		_, _ = client.fetch(context.Background(), request{})
+	})
+
+	t.Run("should add authorization header if username and password are not empty", func(st *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			assert.NotEqual(t, r.Header.Get("authorization"), "")
+			auth := base64.StdEncoding.EncodeToString([]byte("username:secret"))
+			assert.Equal(t, r.Header.Get("authorization"), "Basic "+auth)
+		}
+		s := httptest.NewServer(http.HandlerFunc(handler))
+		client := New(
+			WithURL(s.URL),
+			WithHttpClient(s.Client()),
+			WithBasicAuth("username", "secret"),
+		)
+		_, _ = client.fetch(context.Background(), request{})
+	})
+
+	t.Run("should return an error with result property different to success", func(st *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"result": "unknown"}`))
+		}
+		s := httptest.NewServer(http.HandlerFunc(handler))
+		client := New(WithURL(s.URL), WithHttpClient(s.Client()))
+		res, err := client.fetch(context.Background(), request{})
+		assert.Nil(t, res)
+		assert.NotNil(t, err)
+		assert.Error(t, err)
+	})
+
+	t.Run("should retry the same quantity of maxRetries property when http code is 409", func(st *testing.T) {
+		tests := []struct {
+			expected int
+			input    int
+		}{
+			{input: 2, expected: 2},
+			{input: 0, expected: 2},
+			{input: 1, expected: 1},
+			{input: 20, expected: 20},
+			{input: -1, expected: 2},
+		}
+
+		for _, test := range tests {
+			retries := new(int)
+			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				*retries = *retries + 1
+				w.WriteHeader(http.StatusConflict)
+			}))
+			client := New(WithURL(s.URL), WithHttpClient(s.Client()))
+			res, err := client.fetch(context.Background(), request{MaxRetries: test.input})
+
+			assert.Nil(t, res)
+			assert.NotNil(t, err)
+			assert.Error(t, err)
+			assert.Equal(t, test.expected, *retries)
+		}
+	})
+
+	t.Run("should return a valid response", func(st *testing.T) {})
+}
 
 func BenchmarkFetch(t *testing.B) {}
 
