@@ -42,7 +42,8 @@ const (
 	ResponseResultSuccess = "success"
 	SessionIdHeader       = "X-Transmission-Session-Id"
 
-	MaxRetries = 2
+	DefaultMaxRetries = 2
+	MaxRetries        = 10
 )
 
 var (
@@ -59,7 +60,7 @@ type request struct {
 	Method     Method      `json:"method,omitempty"`    // string telling the name of the method to invoke
 	Arguments  interface{} `json:"arguments,omitempty"` // object of key/value pairs
 	Tag        int64       `json:"tag,omitempty"`       // number used by clients to track responses (same request tag value)
-	MaxRetries int         `json:"-"`                   // used internally to avoid retries when token is invalid/expired
+	AvoidRetry bool        `json:"-"`
 }
 
 type TorrentAction struct {
@@ -206,6 +207,7 @@ type Client struct {
 	URL        string
 	SessionId  string
 	HttpClient *http.Client
+	MaxRetries int
 }
 
 func WithURL(url string) Option {
@@ -231,8 +233,21 @@ func WithHttpClient(client *http.Client) Option {
 	}
 }
 
+func WithMaxRetries(maxRetries int) Option {
+	return func(c *Client) {
+		if maxRetries <= 0 {
+			c.MaxRetries = DefaultMaxRetries
+		} else if maxRetries > MaxRetries {
+			// avoid infinite retries
+			c.MaxRetries = MaxRetries
+		} else {
+			c.MaxRetries = maxRetries
+		}
+	}
+}
+
 func New(opts ...Option) *Client {
-	client := Client{HttpClient: &http.Client{}}
+	client := Client{HttpClient: &http.Client{}, MaxRetries: DefaultMaxRetries}
 	for _, o := range opts {
 		o(&client)
 	}
@@ -247,16 +262,29 @@ func fillStruct(base interface{}, target interface{}) error {
 	return json.Unmarshal(buf, target)
 }
 
-func (c *Client) doRequest(request *http.Request, maxRetries int) (*http.Response, error) {
+func (c *Client) doRequest(ctx context.Context, body []byte, maxRetries int) (*http.Response, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.URL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request with context: %+v", err)
+	}
+
+	if c.Password != "" && c.Username != "" {
+		request.SetBasicAuth(c.Username, c.Password)
+	}
+	request.Header.Set("User-Agent", "transmission")
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set(SessionIdHeader, c.SessionId)
+
 	resp, err := c.HttpClient.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("unexpected error sending http request: %+v", err)
 	}
 	if resp.StatusCode == http.StatusConflict {
+		c.SessionId = resp.Header.Get(SessionIdHeader)
 		if maxRetries-1 <= 0 {
 			return nil, ErrInvalidSessionId
 		}
-		return c.doRequest(request, maxRetries-1)
+		return c.doRequest(ctx, body, maxRetries-1)
 	}
 	return resp, nil
 }
@@ -267,23 +295,13 @@ func (c *Client) fetch(ctx context.Context, request request) (*response, error) 
 		return nil, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.URL, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request with context: %+v", err)
+	// overwrite client maxRetries value
+	maxRetries := c.MaxRetries
+	if request.AvoidRetry {
+		maxRetries = 1
 	}
 
-	if c.Password != "" && c.Username != "" {
-		req.SetBasicAuth(c.Username, c.Password)
-	}
-	req.Header.Set("User-Agent", "transmission")
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set(SessionIdHeader, c.SessionId)
-
-	maxRetries := request.MaxRetries
-	if request.MaxRetries <= 0 {
-		maxRetries = MaxRetries
-	}
-	resp, err := c.doRequest(req, maxRetries)
+	resp, err := c.doRequest(ctx, body, maxRetries)
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +325,7 @@ func (c *Client) fetch(ctx context.Context, request request) (*response, error) 
 
 func (c *Client) Ping(ctx context.Context) error {
 	// this is just a hack to retrieve a valid session id token
-	_, err := c.fetch(ctx, request{Method: "ping", MaxRetries: 1})
+	_, err := c.fetch(ctx, request{Method: "ping", AvoidRetry: true})
 	if errors.Is(err, ErrInvalidSessionId) {
 		return nil
 	}
