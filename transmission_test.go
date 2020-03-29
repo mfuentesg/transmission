@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// nolint
 var data = map[string]interface{}{
 	"arguments": map[string]interface{}{
 		"torrents": []interface{}{
@@ -380,6 +381,7 @@ var data = map[string]interface{}{
 	"result": "success",
 }
 
+// nolint
 var dataStr = `
 {
     "arguments": {
@@ -754,6 +756,7 @@ var dataStr = `
 
 func TestWithURL(t *testing.T) {
 	var client Client
+
 	fakeURL := "http://fake.com/tranmission/rpc"
 	WithURL(fakeURL)(&client)
 
@@ -786,6 +789,7 @@ func TestWithMaxRetries(t *testing.T) {
 
 func TestWithBasicAuth(t *testing.T) {
 	var client Client
+
 	WithBasicAuth("user", "password")(&client)
 
 	assert.Equal(t, "user", client.Username)
@@ -796,16 +800,16 @@ func TestWithHttpClient(t *testing.T) {
 	var client Client
 
 	t.Run("should assign set default http client with an invalid parameter", func(st *testing.T) {
-		WithHttpClient(nil)(&client)
-		assert.NotNil(st, client.HttpClient)
+		WithHTTPClient(nil)(&client)
+		assert.NotNil(st, client.HTTPClient)
 	})
 
 	t.Run("should assign valid http client", func(st *testing.T) {
 		httpClient := &http.Client{
 			Timeout: 15000,
 		}
-		WithHttpClient(httpClient)(&client)
-		assert.Equal(st, httpClient.Timeout, client.HttpClient.Timeout)
+		WithHTTPClient(httpClient)(&client)
+		assert.Equal(st, httpClient.Timeout, client.HTTPClient.Timeout)
 	})
 }
 
@@ -818,7 +822,7 @@ func TestNew(t *testing.T) {
 
 	t.Run("should assign default values", func(st *testing.T) {
 		cl := New()
-		assert.IsType(st, &http.Client{}, cl.HttpClient)
+		assert.IsType(st, &http.Client{}, cl.HTTPClient)
 		assert.IsType(st, DefaultMaxRetries, cl.MaxRetries)
 	})
 }
@@ -827,6 +831,7 @@ func TestFillStruct(t *testing.T) {
 	type user struct {
 		Name string `json:"name"`
 	}
+
 	tests := []struct {
 		name              string
 		base              interface{}
@@ -858,8 +863,10 @@ func TestFillStruct(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(st *testing.T) {
+			// nolint
 			err := fillStruct(test.base, test.target)
 
+			// nolint
 			if test.isErrorExpected {
 				assert.NotNil(st, err)
 				assert.Error(st, err)
@@ -867,7 +874,7 @@ func TestFillStruct(t *testing.T) {
 				assert.Nil(st, err)
 				assert.NoError(st, err)
 			}
-
+			// nolint
 			if test.shouldCheckTarget {
 				assert.Equal(st, "transmission", test.target.Name)
 			}
@@ -895,6 +902,7 @@ func TestFetch(t *testing.T) {
 
 	t.Run("should return an error with context nil", func(st *testing.T) {
 		client := New()
+		// nolint
 		res, err := client.fetch(nil, request{
 			Arguments: map[string]interface{}{},
 		})
@@ -912,12 +920,11 @@ func TestFetch(t *testing.T) {
 	})
 
 	t.Run("should return an error an invalid body response", func(st *testing.T) {
-		handler := func(w http.ResponseWriter, r *http.Request) {
+		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`<>`))
-		}
-		s := httptest.NewServer(http.HandlerFunc(handler))
-		client := New(WithURL(s.URL), WithHttpClient(s.Client()))
+		}))
+		client := New(WithURL(s.URL), WithHTTPClient(s.Client()))
 		res, err := client.fetch(context.Background(), request{})
 		assert.Nil(st, res)
 		assert.NotNil(st, err)
@@ -925,65 +932,60 @@ func TestFetch(t *testing.T) {
 	})
 
 	t.Run("should not add authorization header if username is empty", func(st *testing.T) {
-		handler := func(w http.ResponseWriter, r *http.Request) {
+		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			assert.Equal(st, r.Header.Get("authorization"), "")
-		}
-		s := httptest.NewServer(http.HandlerFunc(handler))
+		}))
 		client := New(
 			WithURL(s.URL),
-			WithHttpClient(s.Client()),
+			WithHTTPClient(s.Client()),
 			WithBasicAuth("", "secret"),
 		)
 		_, _ = client.fetch(context.Background(), request{})
 	})
 
 	t.Run("should not add authorization header if password is empty", func(st *testing.T) {
-		handler := func(w http.ResponseWriter, r *http.Request) {
+		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			assert.Equal(st, r.Header.Get("authorization"), "")
-		}
-		s := httptest.NewServer(http.HandlerFunc(handler))
+		}))
 		client := New(
 			WithURL(s.URL),
-			WithHttpClient(s.Client()),
+			WithHTTPClient(s.Client()),
 			WithBasicAuth("username", ""),
 		)
 		_, _ = client.fetch(context.Background(), request{})
 	})
 
 	t.Run("should not add authorization header if username and password are empty", func(st *testing.T) {
-		handler := func(w http.ResponseWriter, r *http.Request) {
+		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			assert.Equal(st, r.Header.Get("authorization"), "")
-		}
-		s := httptest.NewServer(http.HandlerFunc(handler))
+		}))
 		client := New(
 			WithURL(s.URL),
-			WithHttpClient(s.Client()),
+			WithHTTPClient(s.Client()),
 		)
 		_, _ = client.fetch(context.Background(), request{})
 	})
 
 	t.Run("should add authorization header if username and password are not empty", func(st *testing.T) {
-		handler := func(w http.ResponseWriter, r *http.Request) {
+		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			assert.NotEqual(st, r.Header.Get("authorization"), "")
 			auth := base64.StdEncoding.EncodeToString([]byte("username:secret"))
 			assert.Equal(st, r.Header.Get("authorization"), "Basic "+auth)
-		}
-		s := httptest.NewServer(http.HandlerFunc(handler))
+		}))
 		client := New(
 			WithURL(s.URL),
-			WithHttpClient(s.Client()),
+			WithHTTPClient(s.Client()),
 			WithBasicAuth("username", "secret"),
 		)
 		_, _ = client.fetch(context.Background(), request{})
 	})
 
 	t.Run("should return an error with result property different to success", func(st *testing.T) {
-		handler := func(w http.ResponseWriter, r *http.Request) {
+		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"result": "unknown"}`))
-		}
-		s := httptest.NewServer(http.HandlerFunc(handler))
-		client := New(WithURL(s.URL), WithHttpClient(s.Client()))
+		}))
+		client := New(WithURL(s.URL), WithHTTPClient(s.Client()))
 		res, err := client.fetch(context.Background(), request{})
 		assert.Nil(st, res)
 		assert.NotNil(st, err)
@@ -1005,11 +1007,11 @@ func TestFetch(t *testing.T) {
 		for _, test := range tests {
 			retries := new(int)
 			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				*retries = *retries + 1
+				*retries++
 				w.WriteHeader(http.StatusConflict)
 				_, _ = w.Write([]byte(`{"result": "unknown"}`))
 			}))
-			client := New(WithURL(s.URL), WithHttpClient(s.Client()), WithMaxRetries(test.input))
+			client := New(WithURL(s.URL), WithHTTPClient(s.Client()), WithMaxRetries(test.input))
 			res, err := client.fetch(context.Background(), request{})
 
 			assert.Nil(st, res)
@@ -1022,11 +1024,11 @@ func TestFetch(t *testing.T) {
 	t.Run("should not retry when AvoidRetry is true", func(st *testing.T) {
 		retries := new(int)
 		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			*retries = *retries + 1
+			*retries++
 			w.WriteHeader(http.StatusConflict)
 			_, _ = w.Write([]byte(`{"result": "unknown"}`))
 		}))
-		client := New(WithURL(s.URL), WithHttpClient(s.Client()), WithMaxRetries(5))
+		client := New(WithURL(s.URL), WithHTTPClient(s.Client()), WithMaxRetries(5))
 		res, err := client.fetch(context.Background(), request{AvoidRetry: true})
 
 		assert.Nil(st, res)
@@ -1036,21 +1038,21 @@ func TestFetch(t *testing.T) {
 	})
 
 	t.Run("should set session id header when request fails with http code 409", func(st *testing.T) {
-		sessionId := "session-id"
+		sessionID := "session-id"
 		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set(SessionIdHeader, sessionId)
+			w.Header().Set(SessionIDHeader, sessionID)
 			w.WriteHeader(http.StatusConflict)
 			_, _ = w.Write([]byte(`{"result": "unknown"}`))
 		}))
-		client := New(WithURL(s.URL), WithHttpClient(s.Client()), WithMaxRetries(1))
+		client := New(WithURL(s.URL), WithHTTPClient(s.Client()), WithMaxRetries(1))
 		_, _ = client.fetch(context.Background(), request{})
-		assert.Equal(st, sessionId, client.SessionId)
+		assert.Equal(st, sessionID, client.SessionID)
 	})
 
 	t.Run("should execute only the necessary retries", func(st *testing.T) {
 		retries := new(int)
 		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			*retries = *retries + 1
+			*retries++
 			if *retries == 2 {
 				w.WriteHeader(http.StatusOK)
 				_, _ = w.Write([]byte(`{"result": "success"}`))
@@ -1059,7 +1061,7 @@ func TestFetch(t *testing.T) {
 			w.WriteHeader(http.StatusConflict)
 			_, _ = w.Write([]byte(`{"result": "unknown"}`))
 		}))
-		client := New(WithURL(s.URL), WithHttpClient(s.Client()), WithMaxRetries(5))
+		client := New(WithURL(s.URL), WithHTTPClient(s.Client()), WithMaxRetries(5))
 		res, err := client.fetch(context.Background(), request{})
 
 		assert.NotNil(st, res)
@@ -1071,11 +1073,11 @@ func TestFetch(t *testing.T) {
 	t.Run("should return a valid response", func(st *testing.T) {
 		retries := new(int)
 		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			*retries = *retries + 1
+			*retries++
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"result": "success"}`))
 		}))
-		client := New(WithURL(s.URL), WithHttpClient(s.Client()))
+		client := New(WithURL(s.URL), WithHTTPClient(s.Client()))
 		res, err := client.fetch(context.Background(), request{})
 
 		assert.NotNil(st, res)
@@ -1093,7 +1095,8 @@ func BenchmarkFetch(b *testing.B) {
 		_, _ = w.Write([]byte(dataStr))
 	}))
 
-	client := New(WithURL(s.URL), WithHttpClient(s.Client()))
+	client := New(WithURL(s.URL), WithHTTPClient(s.Client()))
+
 	for i := 0; i < b.N; i++ {
 		_, _ = client.fetch(context.Background(), request{})
 	}
@@ -1130,17 +1133,19 @@ func TestClient_Ping(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(st *testing.T) {
-			handler := func(w http.ResponseWriter, r *http.Request) {
+			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// nolint
 				w.WriteHeader(test.statusCode)
+				// nolint
 				_, _ = w.Write(test.response)
-			}
-			s := httptest.NewServer(http.HandlerFunc(handler))
+			}))
 			client := New(
 				WithURL(s.URL),
 				WithBasicAuth("username", "password"),
-				WithHttpClient(s.Client()),
+				WithHTTPClient(s.Client()),
 			)
 			err := client.Ping(context.Background())
+			// nolint
 			if test.isErrorExpected {
 				assert.NotNil(st, err)
 				assert.Error(st, err)
