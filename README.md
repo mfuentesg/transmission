@@ -102,7 +102,7 @@ func main() {
 
 ## TODO
 
-- [ ] Write performance tests
+- [ ] Write benchmark tests
 - [ ] Write unit tests
 - [ ] Add CI/CD for linting and tests
 - [ ] Improve README file
