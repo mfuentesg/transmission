@@ -3,6 +3,8 @@ package transmission
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -754,6 +756,20 @@ var dataStr = `
 }
 `
 
+var tests = []struct {
+	response []byte
+	isError  bool
+}{
+	{
+		response: []byte(`{"result": "unknown"}`),
+		isError:  true,
+	},
+	{
+		response: []byte(`{"result": "success"}`),
+		isError:  false,
+	},
+}
+
 func TestWithURL(t *testing.T) {
 	var client Client
 
@@ -1155,45 +1171,154 @@ func TestClient_Ping(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("should get `ping` method name", func(st *testing.T) {
+		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req request
+			_ = json.NewDecoder(r.Body).Decode(&req)
+			assert.Equal(st, Method("ping"), req.Method)
+		}))
+		client := New(
+			WithURL(s.URL),
+			WithBasicAuth("username", "password"),
+			WithHTTPClient(s.Client()),
+		)
+		_ = client.Ping(context.Background())
+	})
 }
 
-func TestClient_TorrentStart(t *testing.T) {}
+func testMethodWithError(t *testing.T, method Method, cb func(*Client) error) {
+	t.Run("should get the expected response", func(st *testing.T) {
+		for _, test := range tests {
+			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				// nolint
+				_, _ = w.Write(test.response)
+			}))
+			client := New(
+				WithURL(s.URL),
+				WithBasicAuth("username", "password"),
+				WithHTTPClient(s.Client()),
+			)
+			err := cb(client)
+			if test.isError {
+				assert.NotNil(st, err)
+				assert.Error(st, err)
+			} else {
+				assert.Nil(st, err)
+				assert.NoError(st, err)
+			}
+		}
+	})
 
-func TestClient_TorrentStartNow(t *testing.T) {}
+	t.Run(fmt.Sprintf("should get `%s` method", method), func(st *testing.T) {
+		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req request
+			_ = json.NewDecoder(r.Body).Decode(&req)
+			assert.Equal(st, method, req.Method)
+		}))
+		client := New(
+			WithURL(s.URL),
+			WithBasicAuth("username", "password"),
+			WithHTTPClient(s.Client()),
+		)
+		_ = cb(client)
+	})
+}
 
-func TestClient_TorrentStop(t *testing.T) {}
+func TestClient_TorrentStart(t *testing.T) {
+	testMethodWithError(t, MethodTorrentStart, func(client *Client) error {
+		return client.TorrentStart(context.Background(), Filter{})
+	})
+}
 
-func TestClient_TorrentVerify(t *testing.T) {}
+func TestClient_TorrentStartNow(t *testing.T) {
+	testMethodWithError(t, MethodTorrentStartNow, func(client *Client) error {
+		return client.TorrentStartNow(context.Background(), Filter{})
+	})
+}
 
-func TestClient_TorrentReannounce(t *testing.T) {}
+func TestClient_TorrentStop(t *testing.T) {
+	testMethodWithError(t, MethodTorrentStop, func(client *Client) error {
+		return client.TorrentStop(context.Background(), Filter{})
+	})
+}
+
+func TestClient_TorrentVerify(t *testing.T) {
+	testMethodWithError(t, MethodTorrentVerify, func(client *Client) error {
+		return client.TorrentVerify(context.Background(), Filter{})
+	})
+}
+
+func TestClient_TorrentReannounce(t *testing.T) {
+	testMethodWithError(t, MethodTorrentReannounce, func(client *Client) error {
+		return client.TorrentReannounce(context.Background(), Filter{})
+	})
+}
 
 func TestClient_TorrentGet(t *testing.T) {}
 
 func TestClient_TorrentRename(t *testing.T) {}
 
-func TestClient_TorrentSet(t *testing.T) {}
+func TestClient_TorrentSet(t *testing.T) {
+	testMethodWithError(t, MethodTorrentSet, func(client *Client) error {
+		return client.TorrentSet(context.Background(), TorrentSet{})
+	})
+}
 
 func TestClient_TorrentAdd(t *testing.T) {}
 
-func TestClient_TorrentRemove(t *testing.T) {}
+func TestClient_TorrentRemove(t *testing.T) {
+	testMethodWithError(t, MethodTorrentRemove, func(client *Client) error {
+		return client.TorrentRemove(context.Background(), TorrentRemove{})
+	})
+}
 
-func TestClient_TorrentMove(t *testing.T) {}
+func TestClient_TorrentMove(t *testing.T) {
+	testMethodWithError(t, MethodTorrentMove, func(client *Client) error {
+		return client.TorrentMove(context.Background(), TorrentMove{})
+	})
+}
 
-func TestClient_SessionSet(t *testing.T) {}
+func TestClient_SessionSet(t *testing.T) {
+	testMethodWithError(t, MethodSessionSet, func(client *Client) error {
+		return client.SessionSet(context.Background(), SessionSet{})
+	})
+}
 
 func TestClient_SessionGet(t *testing.T) {}
 
 func TestClient_SessionStats(t *testing.T) {}
 
-func TestClient_SessionClose(t *testing.T) {}
+func TestClient_SessionClose(t *testing.T) {
+	testMethodWithError(t, MethodSessionClose, func(client *Client) error {
+		return client.SessionClose(context.Background())
+	})
+}
 
-func TestClient_QueueMoveTop(t *testing.T) {}
+func TestClient_QueueMoveTop(t *testing.T) {
+	testMethodWithError(t, MethodQueueMoveTop, func(client *Client) error {
+		return client.QueueMoveTop(context.Background(), Filter{})
+	})
+}
 
-func TestClient_QueueMoveBottom(t *testing.T) {}
+func TestClient_QueueMoveBottom(t *testing.T) {
+	testMethodWithError(t, MethodQueueMoveBottom, func(client *Client) error {
+		return client.QueueMoveBottom(context.Background(), Filter{})
+	})
+}
 
-func TestClient_QueueMoveUp(t *testing.T) {}
+func TestClient_QueueMoveUp(t *testing.T) {
+	testMethodWithError(t, MethodQueueMoveUp, func(client *Client) error {
+		return client.QueueMoveUp(context.Background(), Filter{})
+	})
+}
 
-func TestClient_QueueMoveDown(t *testing.T) {}
+func TestClient_QueueMoveDown(t *testing.T) {
+	testMethodWithError(t, MethodQueueMoveDown, func(client *Client) error {
+		return client.QueueMoveDown(context.Background(), Filter{})
+	})
+}
 
 func TestClient_FreeSpace(t *testing.T) {}
 

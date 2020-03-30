@@ -30,10 +30,10 @@ const (
 	MethodSessionSet   Method = "session-set"
 	MethodSessionStats Method = "session-stats"
 
-	MethodQueueTop    Method = "queue-move-top"
-	MethodQueueUp     Method = "queue-move-up"
-	MethodQueueDown   Method = "queue-move-down"
-	MethodQueueBottom Method = "queue-move-bottom"
+	MethodQueueMoveTop    Method = "queue-move-top"
+	MethodQueueMoveUp     Method = "queue-move-up"
+	MethodQueueMoveDown   Method = "queue-move-down"
+	MethodQueueMoveBottom Method = "queue-move-bottom"
 
 	MethodFreeSpace       Method = "free-space"
 	MethodPortTest        Method = "port-test"
@@ -63,11 +63,7 @@ type request struct {
 	AvoidRetry bool        `json:"-"`
 }
 
-type TorrentAction struct {
-	Ids interface{} `json:"ids"`
-}
-
-type QueueMovement struct {
+type Filter struct {
 	Ids interface{} `json:"ids"`
 }
 
@@ -344,27 +340,27 @@ func (c *Client) Ping(ctx context.Context) error {
 	return err
 }
 
-func (c *Client) TorrentStart(ctx context.Context, args TorrentAction) error {
+func (c *Client) TorrentStart(ctx context.Context, args Filter) error {
 	_, err := c.fetch(ctx, request{Method: MethodTorrentStart, Arguments: args})
 	return err
 }
 
-func (c *Client) TorrentStartNow(ctx context.Context, args TorrentAction) error {
+func (c *Client) TorrentStartNow(ctx context.Context, args Filter) error {
 	_, err := c.fetch(ctx, request{Method: MethodTorrentStartNow, Arguments: args})
 	return err
 }
 
-func (c *Client) TorrentStop(ctx context.Context, args TorrentAction) error {
+func (c *Client) TorrentStop(ctx context.Context, args Filter) error {
 	_, err := c.fetch(ctx, request{Method: MethodTorrentStop, Arguments: args})
 	return err
 }
 
-func (c *Client) TorrentVerify(ctx context.Context, args TorrentAction) error {
+func (c *Client) TorrentVerify(ctx context.Context, args Filter) error {
 	_, err := c.fetch(ctx, request{Method: MethodTorrentVerify, Arguments: args})
 	return err
 }
 
-func (c *Client) TorrentReannounce(ctx context.Context, args TorrentAction) error {
+func (c *Client) TorrentReannounce(ctx context.Context, args Filter) error {
 	_, err := c.fetch(ctx, request{Method: MethodTorrentReannounce, Arguments: args})
 	return err
 }
@@ -471,23 +467,23 @@ func (c *Client) SessionClose(ctx context.Context) error {
 	return err
 }
 
-func (c *Client) QueueMoveTop(ctx context.Context, args QueueMovement) error {
-	_, err := c.fetch(ctx, request{Method: MethodQueueTop, Arguments: args})
+func (c *Client) QueueMoveTop(ctx context.Context, args Filter) error {
+	_, err := c.fetch(ctx, request{Method: MethodQueueMoveTop, Arguments: args})
 	return err
 }
 
-func (c *Client) QueueMoveBottom(ctx context.Context, args QueueMovement) error {
-	_, err := c.fetch(ctx, request{Method: MethodQueueBottom, Arguments: args})
+func (c *Client) QueueMoveBottom(ctx context.Context, args Filter) error {
+	_, err := c.fetch(ctx, request{Method: MethodQueueMoveBottom, Arguments: args})
 	return err
 }
 
-func (c *Client) QueueMoveUp(ctx context.Context, args QueueMovement) error {
-	_, err := c.fetch(ctx, request{Method: MethodQueueUp, Arguments: args})
+func (c *Client) QueueMoveUp(ctx context.Context, args Filter) error {
+	_, err := c.fetch(ctx, request{Method: MethodQueueMoveUp, Arguments: args})
 	return err
 }
 
-func (c *Client) QueueMoveDown(ctx context.Context, args QueueMovement) error {
-	_, err := c.fetch(ctx, request{Method: MethodQueueDown, Arguments: args})
+func (c *Client) QueueMoveDown(ctx context.Context, args Filter) error {
+	_, err := c.fetch(ctx, request{Method: MethodQueueMoveDown, Arguments: args})
 	return err
 }
 
