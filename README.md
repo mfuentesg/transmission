@@ -101,8 +101,5 @@ func main() {
 ```
 
 ## TODO
-
-- [ ] Write benchmark tests
-- [ ] Add CI/CD for linting and tests
 - [ ] Improve README file
 - [ ] Add documentation to each function and reference to transmission fields
