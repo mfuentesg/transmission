@@ -756,20 +756,6 @@ var dataStr = `
 }
 `
 
-var tests = []struct {
-	response []byte
-	isError  bool
-}{
-	{
-		response: []byte(`{"result": "unknown"}`),
-		isError:  true,
-	},
-	{
-		response: []byte(`{"result": "success"}`),
-		isError:  false,
-	},
-}
-
 func TestWithURL(t *testing.T) {
 	var client Client
 
@@ -1188,6 +1174,20 @@ func TestClient_Ping(t *testing.T) {
 }
 
 func testMethodWithError(t *testing.T, method Method, cb func(*Client) error) {
+	var tests = []struct {
+		response []byte
+		isError  bool
+	}{
+		{
+			response: []byte(`{"result": "unknown"}`),
+			isError:  true,
+		},
+		{
+			response: []byte(`{"result": "success"}`),
+			isError:  false,
+		},
+	}
+
 	t.Run("should get the expected response", func(st *testing.T) {
 		for _, test := range tests {
 			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1268,6 +1268,40 @@ func TestClient_TorrentRename(t *testing.T) {
 		_, err := client.TorrentRename(context.Background(), TorrentRename{})
 		return err
 	})
+
+	t.Run("should get renamed torrent structure", func(st *testing.T) {
+		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			// nolint
+			_, _ = w.Write([]byte(`
+				{
+					"arguments": {
+						"id": 1,
+						"name": "Dragon Ball",
+						"path": "Dragon+Ball+Z+Kakarot-CODEX"
+					},
+					"result": "success"
+				}
+			`))
+		}))
+		client := New(
+			WithURL(s.URL),
+			WithBasicAuth("username", "password"),
+			WithHTTPClient(s.Client()),
+		)
+
+		torrent, err := client.TorrentRename(context.Background(), TorrentRename{})
+		assert.Nil(st, err)
+		assert.NoError(st, err)
+		assert.IsType(st, Torrent{}, torrent)
+
+		expected := Torrent{
+			Name: "Dragon Ball",
+			Path: "Dragon+Ball+Z+Kakarot-CODEX",
+			ID:   1,
+		}
+		assert.Equal(st, expected, torrent)
+	})
 }
 
 func TestClient_TorrentSet(t *testing.T) {
@@ -1281,6 +1315,50 @@ func TestClient_TorrentAdd(t *testing.T) {
 		_, err := client.TorrentAdd(context.Background(), TorrentAdd{})
 		return err
 	})
+
+	tests := []struct {
+		name      string
+		arguments string
+		expected  Torrent
+	}{
+		{
+			name:      "should get an empty torrent if `torrent-added` and `torrent-duplicate` are empty",
+			arguments: `{}`,
+			expected:  Torrent{},
+		},
+		{
+			name:      "should fill torrent data from `torrent-duplicate` key",
+			arguments: `{ "torrent-duplicate": { "id": 123123, "name": "my torrent" } }`,
+			expected:  Torrent{Name: "my torrent", ID: 123123},
+		},
+		{
+			name:      "should fill torrent data from `torrent-added` key",
+			arguments: `{ "torrent-added": { "id": 123456, "name": "my torrent" } }`,
+			expected:  Torrent{Name: "my torrent", ID: 123456},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(st *testing.T) {
+			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				// nolint
+				_, _ = w.Write([]byte(fmt.Sprintf(`{ "result": "success", "arguments": %s }`, test.arguments)))
+			}))
+			client := New(
+				WithURL(s.URL),
+				WithBasicAuth("username", "password"),
+				WithHTTPClient(s.Client()),
+			)
+
+			torrent, err := client.TorrentAdd(context.Background(), TorrentAdd{})
+			assert.Nil(st, err)
+			assert.NoError(st, err)
+			assert.IsType(st, Torrent{}, torrent)
+			// nolint
+			assert.Equal(st, test.expected, torrent)
+		})
+	}
 }
 
 func TestClient_TorrentRemove(t *testing.T) {
@@ -1613,6 +1691,6 @@ func TestClient_BlockListUpdate(t *testing.T) {
 		assert.Nil(st, err)
 		assert.NoError(st, err)
 		assert.IsType(st, BlockList{}, blockList)
-		assert.Equal(st, expected, blockList.BlockListSize)
+		assert.Equal(st, expected, blockList)
 	})
 }
