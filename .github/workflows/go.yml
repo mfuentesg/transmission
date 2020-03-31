@@ -5,7 +5,6 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
-
     - name: Set up Go 1.14.1
       uses: actions/setup-go@v1
       with:
@@ -18,11 +17,13 @@ jobs:
     - name: Get dependencies
       run: |
         go mod download
-    - name: Unit test
+    
+    - name: Run tests
       run: |
         go test -v -race ./...
-    - name: Lint files
+
+    - name: Execute linting
       run: |
-        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.24.0
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b /usr/local/bin v1.24.0
         golangci-lint run ./...
         
