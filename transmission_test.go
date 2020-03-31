@@ -926,6 +926,8 @@ func TestFetch(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`<>`))
 		}))
+		defer s.Close()
+
 		client := New(WithURL(s.URL), WithHTTPClient(s.Client()))
 		res, err := client.fetch(context.Background(), request{})
 		assert.Nil(st, res)
@@ -937,6 +939,8 @@ func TestFetch(t *testing.T) {
 		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			assert.Equal(st, r.Header.Get("authorization"), "")
 		}))
+		defer s.Close()
+
 		client := New(
 			WithURL(s.URL),
 			WithHTTPClient(s.Client()),
@@ -949,6 +953,8 @@ func TestFetch(t *testing.T) {
 		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			assert.Equal(st, r.Header.Get("authorization"), "")
 		}))
+		defer s.Close()
+
 		client := New(
 			WithURL(s.URL),
 			WithHTTPClient(s.Client()),
@@ -961,6 +967,8 @@ func TestFetch(t *testing.T) {
 		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			assert.Equal(st, r.Header.Get("authorization"), "")
 		}))
+		defer s.Close()
+
 		client := New(
 			WithURL(s.URL),
 			WithHTTPClient(s.Client()),
@@ -974,6 +982,8 @@ func TestFetch(t *testing.T) {
 			auth := base64.StdEncoding.EncodeToString([]byte("username:secret"))
 			assert.Equal(st, r.Header.Get("authorization"), "Basic "+auth)
 		}))
+		defer s.Close()
+
 		client := New(
 			WithURL(s.URL),
 			WithHTTPClient(s.Client()),
@@ -987,6 +997,8 @@ func TestFetch(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"result": "unknown"}`))
 		}))
+		defer s.Close()
+
 		client := New(WithURL(s.URL), WithHTTPClient(s.Client()))
 		res, err := client.fetch(context.Background(), request{})
 		assert.Nil(st, res)
@@ -1013,6 +1025,7 @@ func TestFetch(t *testing.T) {
 				w.WriteHeader(http.StatusConflict)
 				_, _ = w.Write([]byte(`{"result": "unknown"}`))
 			}))
+
 			client := New(WithURL(s.URL), WithHTTPClient(s.Client()), WithMaxRetries(test.input))
 			res, err := client.fetch(context.Background(), request{})
 
@@ -1020,6 +1033,8 @@ func TestFetch(t *testing.T) {
 			assert.NotNil(st, err)
 			assert.Error(st, err)
 			assert.Equal(st, test.expected, *retries)
+
+			s.Close()
 		}
 	})
 
@@ -1030,6 +1045,8 @@ func TestFetch(t *testing.T) {
 			w.WriteHeader(http.StatusConflict)
 			_, _ = w.Write([]byte(`{"result": "unknown"}`))
 		}))
+		defer s.Close()
+
 		client := New(WithURL(s.URL), WithHTTPClient(s.Client()), WithMaxRetries(5))
 		res, err := client.fetch(context.Background(), request{AvoidRetry: true})
 
@@ -1046,6 +1063,8 @@ func TestFetch(t *testing.T) {
 			w.WriteHeader(http.StatusConflict)
 			_, _ = w.Write([]byte(`{"result": "unknown"}`))
 		}))
+		defer s.Close()
+
 		client := New(WithURL(s.URL), WithHTTPClient(s.Client()), WithMaxRetries(1))
 		_, _ = client.fetch(context.Background(), request{})
 		assert.Equal(st, sessionID, client.SessionID)
@@ -1063,6 +1082,8 @@ func TestFetch(t *testing.T) {
 			w.WriteHeader(http.StatusConflict)
 			_, _ = w.Write([]byte(`{"result": "unknown"}`))
 		}))
+		defer s.Close()
+
 		client := New(WithURL(s.URL), WithHTTPClient(s.Client()), WithMaxRetries(5))
 		res, err := client.fetch(context.Background(), request{})
 
@@ -1079,6 +1100,8 @@ func TestFetch(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"result": "success"}`))
 		}))
+		defer s.Close()
+
 		client := New(WithURL(s.URL), WithHTTPClient(s.Client()))
 		res, err := client.fetch(context.Background(), request{})
 
@@ -1096,6 +1119,7 @@ func BenchmarkFetch(b *testing.B) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(dataStr))
 	}))
+	defer s.Close()
 
 	client := New(WithURL(s.URL), WithHTTPClient(s.Client()))
 
@@ -1141,6 +1165,8 @@ func TestClient_Ping(t *testing.T) {
 				// nolint
 				_, _ = w.Write(test.response)
 			}))
+			defer s.Close()
+
 			client := New(
 				WithURL(s.URL),
 				WithBasicAuth("username", "password"),
@@ -1164,6 +1190,8 @@ func TestClient_Ping(t *testing.T) {
 			_ = json.NewDecoder(r.Body).Decode(&req)
 			assert.Equal(st, Method("ping"), req.Method)
 		}))
+		defer s.Close()
+
 		client := New(
 			WithURL(s.URL),
 			WithBasicAuth("username", "password"),
@@ -1208,6 +1236,8 @@ func testMethodWithError(t *testing.T, method Method, cb func(*Client) error) {
 				assert.Nil(st, err)
 				assert.NoError(st, err)
 			}
+
+			s.Close()
 		}
 	})
 
@@ -1217,6 +1247,8 @@ func testMethodWithError(t *testing.T, method Method, cb func(*Client) error) {
 			_ = json.NewDecoder(r.Body).Decode(&req)
 			assert.Equal(st, method, req.Method)
 		}))
+		defer s.Close()
+
 		client := New(
 			WithURL(s.URL),
 			WithBasicAuth("username", "password"),
@@ -1284,6 +1316,8 @@ func TestClient_TorrentRename(t *testing.T) {
 				}
 			`))
 		}))
+		defer s.Close()
+
 		client := New(
 			WithURL(s.URL),
 			WithBasicAuth("username", "password"),
@@ -1345,6 +1379,7 @@ func TestClient_TorrentAdd(t *testing.T) {
 				// nolint
 				_, _ = w.Write([]byte(fmt.Sprintf(`{ "result": "success", "arguments": %s }`, test.arguments)))
 			}))
+			defer s.Close()
 			client := New(
 				WithURL(s.URL),
 				WithBasicAuth("username", "password"),
@@ -1448,6 +1483,8 @@ func TestClient_SessionGet(t *testing.T) {
 				}
 			`))
 		}))
+		defer s.Close()
+
 		client := New(
 			WithURL(s.URL),
 			WithBasicAuth("username", "password"),
@@ -1541,6 +1578,8 @@ func TestClient_SessionStats(t *testing.T) {
 				}
 			`))
 		}))
+		defer s.Close()
+
 		client := New(
 			WithURL(s.URL),
 			WithBasicAuth("username", "password"),
@@ -1615,6 +1654,8 @@ func TestClient_FreeSpace(t *testing.T) {
 				}
 			}`))
 		}))
+		defer s.Close()
+
 		client := New(
 			WithURL(s.URL),
 			WithBasicAuth("username", "password"),
@@ -1650,6 +1691,8 @@ func TestClient_PortCheck(t *testing.T) {
 				"arguments": { "port-is-open": true }
 			}`))
 		}))
+		defer s.Close()
+
 		client := New(
 			WithURL(s.URL),
 			WithBasicAuth("username", "password"),
@@ -1680,6 +1723,8 @@ func TestClient_BlockListUpdate(t *testing.T) {
 				"arguments": { "blocklist-size": 123123 }
 			}`))
 		}))
+		defer s.Close()
+
 		client := New(
 			WithURL(s.URL),
 			WithBasicAuth("username", "password"),
