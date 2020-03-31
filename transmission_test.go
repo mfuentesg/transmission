@@ -1293,6 +1293,45 @@ func TestClient_TorrentGet(t *testing.T) {
 		_, err := client.TorrentGet(context.Background(), TorrentGet{})
 		return err
 	})
+
+	tests := []struct {
+		name      string
+		arguments string
+		expected  []Torrent
+	}{
+		{
+			name:      "should get a empty list of torrents",
+			arguments: "{}",
+		},
+		{
+			name:      "should get a filled list of orders",
+			arguments: `{ "torrents": [{ "id": 123123, "name": "torrent1" }, { "id": 456456, "name": "torrent2" }] }`,
+			expected:  []Torrent{{ID: 123123, Name: "torrent1"}, {ID: 456456, Name: "torrent2"}},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(st *testing.T) {
+			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				// nolint
+				_, _ = w.Write([]byte(fmt.Sprintf(`{ "result": "success", "arguments": %s }`, test.arguments)))
+			}))
+			defer s.Close()
+			client := New(
+				WithURL(s.URL),
+				WithBasicAuth("username", "password"),
+				WithHTTPClient(s.Client()),
+			)
+
+			torrent, err := client.TorrentGet(context.Background(), TorrentGet{})
+			assert.Nil(st, err)
+			assert.NoError(st, err)
+			assert.IsType(st, []Torrent{}, torrent)
+			// nolint
+			assert.Equal(st, test.expected, torrent)
+		})
+	}
 }
 
 func TestClient_TorrentRename(t *testing.T) {
