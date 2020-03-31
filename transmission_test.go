@@ -889,6 +889,7 @@ func BenchmarkFillStruct(b *testing.B) {
 		var resp response
 		_ = fillStruct(data, &resp)
 	}
+	b.ReportAllocs()
 }
 
 func TestFetch(t *testing.T) {
@@ -1137,12 +1138,12 @@ func BenchmarkFetch(b *testing.B) {
 		_, _ = w.Write([]byte(dataStr))
 	}))
 	defer s.Close()
-
 	client := New(WithURL(s.URL), WithHTTPClient(s.Client()))
 
 	for i := 0; i < b.N; i++ {
 		_, _ = client.fetch(context.Background(), request{})
 	}
+	b.ReportAllocs()
 }
 
 func TestClient_Ping(t *testing.T) {
