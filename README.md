@@ -1,5 +1,10 @@
 # transmission
 
+![](https://img.shields.io/codecov/c/github/mfuentesg/transmission/master)
+![](https://img.shields.io/github/languages/top/mfuentesg/transmission)
+![](https://github.com/mfuentesg/transmission/workflows/Go/badge.svg?branch=master)
+![](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)
+
 This repository it's a wrapper for [`transmission RPC API`](https://github.com/transmission/transmission/blob/master/extras/rpc-spec.txt).
 
 ## Available methods
