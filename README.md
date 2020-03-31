@@ -95,7 +95,7 @@ func main() {
     }
 
     for _, torrent := range torrents {
-    	fmt.Printf("torrent with id %d and hashString %s\n", torrent.Id, torrent.HashString)
+    	fmt.Printf("torrent with id %d and hashString %s\n", torrent.ID, torrent.HashString)
     }
 }
 ```
@@ -103,7 +103,6 @@ func main() {
 ## TODO
 
 - [ ] Write benchmark tests
-- [ ] Write unit tests
 - [ ] Add CI/CD for linting and tests
 - [ ] Improve README file
 - [ ] Add documentation to each function and reference to transmission fields
