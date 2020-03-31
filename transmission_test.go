@@ -921,7 +921,7 @@ func TestFetch(t *testing.T) {
 		assert.Error(st, err)
 	})
 
-	t.Run("should return an error an invalid body response", func(st *testing.T) {
+	t.Run("should return an error with invalid body response", func(st *testing.T) {
 		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`<>`))
@@ -933,6 +933,23 @@ func TestFetch(t *testing.T) {
 		assert.Nil(st, res)
 		assert.NotNil(st, err)
 		assert.Error(st, err)
+	})
+
+	t.Run("should return an error trying to read response", func(st *testing.T) {
+		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			hj, _ := w.(http.Hijacker)
+			conn, rw, _ := hj.Hijack()
+			defer conn.Close()
+			_ = rw.Flush()
+		}))
+		defer s.Close()
+
+		client := New(WithURL(s.URL), WithHTTPClient(s.Client()))
+		_, err := client.fetch(context.Background(), request{})
+		assert.NotNil(st, err)
+		assert.Error(st, err)
+		assert.EqualError(st, err, "unexpected EOF")
 	})
 
 	t.Run("should not add authorization header if username is empty", func(st *testing.T) {
