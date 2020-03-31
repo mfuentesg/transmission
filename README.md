@@ -55,10 +55,10 @@ import (
 )
 
 func main() {
-	client := transmission.New(
-		transmission.WithURL("http://service-url.com/tranmission/rpc"),
-		transmission.WithBasicAuth("username", "password"),
-	)
+    client := transmission.New(
+	transmission.WithURL("http://service-url.com/tranmission/rpc"),
+	transmission.WithBasicAuth("username", "password"),
+    )
 
     // this method is not part of the spec (just check connectivity)
     if err := client.Ping(context.Background()); err != nil {
@@ -82,10 +82,10 @@ import (
 )
 
 func main() {
-	client := transmission.New(
-		transmission.WithURL("http://service-url.com/tranmission/rpc"),
-		transmission.WithBasicAuth("username", "password"),
-	)
+    client := transmission.New(
+        transmission.WithURL("http://service-url.com/tranmission/rpc"),
+	transmission.WithBasicAuth("username", "password"),
+    )
 
     // get list of torrents
     // For know more about the available fields, take a look to the below link
