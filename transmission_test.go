@@ -1256,9 +1256,19 @@ func TestClient_TorrentReannounce(t *testing.T) {
 	})
 }
 
-func TestClient_TorrentGet(t *testing.T) {}
+func TestClient_TorrentGet(t *testing.T) {
+	testMethodWithError(t, MethodTorrentGet, func(client *Client) error {
+		_, err := client.TorrentGet(context.Background(), TorrentGet{})
+		return err
+	})
+}
 
-func TestClient_TorrentRename(t *testing.T) {}
+func TestClient_TorrentRename(t *testing.T) {
+	testMethodWithError(t, MethodTorrentRename, func(client *Client) error {
+		_, err := client.TorrentRename(context.Background(), TorrentRename{})
+		return err
+	})
+}
 
 func TestClient_TorrentSet(t *testing.T) {
 	testMethodWithError(t, MethodTorrentSet, func(client *Client) error {
@@ -1266,7 +1276,12 @@ func TestClient_TorrentSet(t *testing.T) {
 	})
 }
 
-func TestClient_TorrentAdd(t *testing.T) {}
+func TestClient_TorrentAdd(t *testing.T) {
+	testMethodWithError(t, MethodTorrentAdd, func(client *Client) error {
+		_, err := client.TorrentAdd(context.Background(), TorrentAdd{})
+		return err
+	})
+}
 
 func TestClient_TorrentRemove(t *testing.T) {
 	testMethodWithError(t, MethodTorrentRemove, func(client *Client) error {
@@ -1286,9 +1301,193 @@ func TestClient_SessionSet(t *testing.T) {
 	})
 }
 
-func TestClient_SessionGet(t *testing.T) {}
+func TestClient_SessionGet(t *testing.T) {
+	testMethodWithError(t, MethodSessionGet, func(client *Client) error {
+		_, err := client.SessionGet(context.Background())
+		return err
+	})
 
-func TestClient_SessionStats(t *testing.T) {}
+	t.Run("should fill Session struct properly", func(st *testing.T) {
+		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			// nolint
+			_, _ = w.Write([]byte(`
+				{
+				    "arguments": {
+				        "alt-speed-time-begin": 480,
+				        "blocklist-url": "http://www.example.com/blocklist",
+				        "cache-size-mb": 64,
+				        "dht-enabled": true,
+				        "download-dir-free-space": 639173394432,
+				        "download-queue-enabled": true,
+				        "download-queue-size": 5,
+				        "encryption": "preferred",
+				        "idle-seeding-limit": 15,
+				        "idle-seeding-limit-enabled": true,
+				        "incomplete-dir-enabled": true,
+				        "peer-limit-global": 200,
+				        "peer-limit-per-torrent": 50,
+				        "peer-port": 51413,
+				        "pex-enabled": true,
+				        "port-forwarding-enabled": true,
+				        "queue-stalled-enabled": true,
+				        "queue-stalled-minutes": 30,
+				        "rename-partial-files": true,
+				        "rpc-version": 15,
+				        "rpc-version-minimum": 1,
+				        "seed-queue-size": 10,
+				        "seedRatioLimited": true,
+				        "speed-limit-down": 100,
+				        "speed-limit-up-enabled": true,
+				        "start-added-torrents": true,
+				        "units": {
+				            "memory-bytes": 1024,
+				            "memory-units": [
+				                "KiB",
+				                "MiB",
+				                "GiB",
+				                "TiB"
+				            ],
+				            "size-bytes": 1000,
+				            "size-units": [
+				                "kB",
+				                "MB",
+				                "GB",
+				                "TB"
+				            ],
+				            "speed-bytes": 1000,
+				            "speed-units": [
+				                "kB/s",
+				                "MB/s",
+				                "GB/s",
+				                "TB/s"
+				            ]
+				        },
+				        "utp-enabled": true,
+				        "version": "2.92 (14714)"
+				    },
+				    "result": "success"
+				}
+			`))
+		}))
+		client := New(
+			WithURL(s.URL),
+			WithBasicAuth("username", "password"),
+			WithHTTPClient(s.Client()),
+		)
+
+		stats, err := client.SessionGet(context.Background())
+		assert.Nil(st, err)
+		assert.NoError(st, err)
+		assert.IsType(st, Session{}, stats)
+
+		expected := Session{
+			AltSpeedTimeBegin:       480,
+			BlockListURL:            "http://www.example.com/blocklist",
+			CacheSizeMb:             64,
+			DhtEnabled:              true,
+			DownloadQueueEnabled:    true,
+			DownloadQueueSize:       5,
+			Encryption:              "preferred",
+			IdleSeedingLimit:        15,
+			IdleSeedingLimitEnabled: true,
+			IncompleteDirEnabled:    true,
+			PeerLimitGlobal:         200,
+			PeerLimitPerTorrent:     50,
+			PeerPort:                51413,
+			PexEnabled:              true,
+			PortForwardingEnabled:   true,
+			QueueStalledEnabled:     true,
+			QueueStalledMinutes:     30,
+			RenamePartialFiles:      true,
+			RPCVersion:              15,
+			RPCVersionMinimum:       1,
+			SeedQueueSize:           10,
+			SeedRatioLimited:        true,
+			SpeedLimitDown:          100,
+			SpeedLimitUpEnabled:     true,
+			StartAddedTorrents:      true,
+			Units: Units{
+				MemoryBytes: 1024,
+				MemoryUnits: []string{
+					"KiB",
+					"MiB",
+					"GiB",
+					"TiB",
+				},
+				SizeBytes: 1000,
+				SizeUnits: []string{
+					"kB",
+					"MB",
+					"GB",
+					"TB",
+				},
+				SpeedBytes: 1000,
+				SpeedUnits: []string{
+					"kB/s",
+					"MB/s",
+					"GB/s",
+					"TB/s",
+				},
+			},
+			UtpEnabled: true,
+			Version:    "2.92 (14714)",
+		}
+		assert.Equal(st, expected, stats)
+	})
+}
+
+func TestClient_SessionStats(t *testing.T) {
+	testMethodWithError(t, MethodSessionStats, func(client *Client) error {
+		_, err := client.SessionStats(context.Background())
+		return err
+	})
+
+	t.Run("should fill SessionStat struct properly", func(st *testing.T) {
+		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			// nolint
+			_, _ = w.Write([]byte(`
+				{
+				    "arguments": {
+				        "current-stats": {
+				            "downloadedBytes": 1873894395,
+				            "sessionCount": 1,
+				            "uploadedBytes": 20889527
+				        },
+				        "pausedTorrentCount": 1,
+				        "torrentCount": 1,
+				        "uploadSpeed": 0
+				    },
+				    "result": "success"
+				}
+			`))
+		}))
+		client := New(
+			WithURL(s.URL),
+			WithBasicAuth("username", "password"),
+			WithHTTPClient(s.Client()),
+		)
+
+		stats, err := client.SessionStats(context.Background())
+		assert.Nil(st, err)
+		assert.NoError(st, err)
+		assert.IsType(st, SessionStats{}, stats)
+
+		expected := SessionStats{
+			PausedTorrentCount: 1,
+			ActiveTorrentCount: 0,
+			TorrentCount:       1,
+			CurrentStats: CurrentStats{
+				DownloadedBytes: 1873894395,
+				FilesAdded:      0,
+				SessionCount:    1,
+				UploadedBytes:   20889527,
+			},
+		}
+		assert.Equal(st, expected, stats)
+	})
+}
 
 func TestClient_SessionClose(t *testing.T) {
 	testMethodWithError(t, MethodSessionClose, func(client *Client) error {
@@ -1320,8 +1519,100 @@ func TestClient_QueueMoveDown(t *testing.T) {
 	})
 }
 
-func TestClient_FreeSpace(t *testing.T) {}
+func TestClient_FreeSpace(t *testing.T) {
+	testMethodWithError(t, MethodFreeSpace, func(client *Client) error {
+		_, err := client.FreeSpace(context.Background(), FreeSpace{})
+		return err
+	})
 
-func TestClient_PortCheck(t *testing.T) {}
+	t.Run("should fill FreeSpace struct properly", func(st *testing.T) {
+		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			// nolint
+			_, _ = w.Write([]byte(`{
+				"result": "success",
+				"arguments": {
+					"path":"/home/transmission/downloads",
+					"size-bytes": 123123
+				}
+			}`))
+		}))
+		client := New(
+			WithURL(s.URL),
+			WithBasicAuth("username", "password"),
+			WithHTTPClient(s.Client()),
+		)
 
-func TestClient_BlockListUpdate(t *testing.T) {}
+		space, err := client.FreeSpace(context.Background(), FreeSpace{
+			Path: "/home/transmission/downloads",
+		})
+		expected := FreeSpace{
+			Path:      "/home/transmission/downloads",
+			SizeBytes: 123123,
+		}
+		assert.Nil(st, err)
+		assert.NoError(st, err)
+		assert.IsType(st, FreeSpace{}, space)
+		assert.Equal(st, expected, space)
+	})
+}
+
+func TestClient_PortCheck(t *testing.T) {
+	testMethodWithError(t, MethodPortTest, func(client *Client) error {
+		_, err := client.PortCheck(context.Background())
+		return err
+	})
+
+	t.Run("should fill PortCheck struct properly", func(st *testing.T) {
+		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			// nolint
+			_, _ = w.Write([]byte(`{
+				"result": "success",
+				"arguments": { "port-is-open": true }
+			}`))
+		}))
+		client := New(
+			WithURL(s.URL),
+			WithBasicAuth("username", "password"),
+			WithHTTPClient(s.Client()),
+		)
+
+		portCheck, err := client.PortCheck(context.Background())
+		expected := PortCheck{PortIsOpen: true}
+		assert.Nil(st, err)
+		assert.NoError(st, err)
+		assert.IsType(st, PortCheck{}, portCheck)
+		assert.Equal(st, expected, portCheck)
+	})
+}
+
+func TestClient_BlockListUpdate(t *testing.T) {
+	testMethodWithError(t, MethodBlockListUpdate, func(client *Client) error {
+		_, err := client.BlockListUpdate(context.Background())
+		return err
+	})
+
+	t.Run("should fill BlockList struct properly", func(st *testing.T) {
+		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			// nolint
+			_, _ = w.Write([]byte(`{
+				"result": "success",
+				"arguments": { "blocklist-size": 123123 }
+			}`))
+		}))
+		client := New(
+			WithURL(s.URL),
+			WithBasicAuth("username", "password"),
+			WithHTTPClient(s.Client()),
+		)
+
+		blockList, err := client.BlockListUpdate(context.Background())
+		expected := BlockList{BlockListSize: 123123}
+		assert.Nil(st, err)
+		assert.NoError(st, err)
+		assert.IsType(st, BlockList{}, blockList)
+		assert.Equal(st, expected, blockList.BlockListSize)
+	})
+}

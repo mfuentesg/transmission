@@ -1,12 +1,12 @@
 package transmission
 
 type Units struct {
-	SpeedUnits  []string // TODO: set default value "kB/s",	"MB/s",	"GB/s",	"TB/s"
-	SpeedBytes  int64
-	SizeUnits   []string // TODO: set default value kB, MB, GB, TB
-	SizeBytes   int64
-	MemoryUnits []string // TODO: set default value KiB, MiB, GiB, TiB
-	MemoryBytes int64
+	SpeedUnits  []string `json:"speed-units,omitempty"`
+	SpeedBytes  int64    `json:"speed-bytes,omitempty"`
+	SizeUnits   []string `json:"size-units,omitempty"`
+	SizeBytes   int64    `json:"size-bytes,omitempty"`
+	MemoryUnits []string `json:"memory-units,omitempty"`
+	MemoryBytes int64    `json:"memory-bytes,omitempty"`
 }
 
 type CumulativeStats struct {

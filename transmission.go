@@ -133,10 +133,6 @@ type TorrentSet struct {
 	UploadLimited       bool               `json:"uploadLimited,omitempty"`
 }
 
-type SessionGet struct {
-	Fields []string `json:"fields,omitempty"`
-}
-
 type SessionSet struct {
 	AltSpeedDown              int64   `json:"alt-speed-down,omitempty"`
 	AltSpeedTimeBegin         int64   `json:"alt-speed-time-begin,omitempty"`
@@ -411,12 +407,19 @@ func (c *Client) TorrentAdd(ctx context.Context, args TorrentAdd) (Torrent, erro
 		return torrent, err
 	}
 
-	added, ok := resp.Arguments["torrent-added"]
-	if !ok {
-		return torrent, nil
+	var torrentResponse interface{}
+
+	// torrent-duplicate is coming when torrent it's already added
+	// to the list (same magnet link)
+	if duplicated, ok := resp.Arguments["torrent-duplicate"]; ok {
+		torrentResponse = duplicated
 	}
 
-	err = fillStruct(added, &torrent)
+	if added, ok := resp.Arguments["torrent-added"]; ok {
+		torrentResponse = added
+	}
+
+	err = fillStruct(torrentResponse, &torrent)
 
 	return torrent, err
 }
@@ -436,10 +439,10 @@ func (c *Client) SessionSet(ctx context.Context, args SessionSet) error {
 	return err
 }
 
-func (c *Client) SessionGet(ctx context.Context, args SessionGet) (Session, error) {
+func (c *Client) SessionGet(ctx context.Context) (Session, error) {
 	var session Session
 
-	resp, err := c.fetch(ctx, request{Method: MethodSessionGet, Arguments: args})
+	resp, err := c.fetch(ctx, request{Method: MethodSessionGet})
 	if err != nil {
 		return session, err
 	}
