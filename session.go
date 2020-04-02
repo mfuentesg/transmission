@@ -63,25 +63,25 @@ type Session struct {
 	SpeedLimitUp              int64   `json:"speed-limit-up,omitempty"`
 	Units                     Units   `json:"units,omitempty"`
 	Version                   string  `json:"version,omitempty"`
-	AltSpeedEnabled           bool    `json:"alt-speed-enabled,omitempty"`
-	AltSpeedTimeEnabled       bool    `json:"alt-speed-time-enabled,omitempty"`
-	BlockListEnabled          bool    `json:"blocklist-enabled,omitempty"`
-	DownloadQueueEnabled      bool    `json:"download-queue-enabled,omitempty"`
-	DhtEnabled                bool    `json:"dht-enabled,omitempty"`
-	IdleSeedingLimitEnabled   bool    `json:"idle-seeding-limit-enabled,omitempty"`
-	IncompleteDirEnabled      bool    `json:"incomplete-dir-enabled,omitempty"`
-	LpdEnabled                bool    `json:"lpd-enabled,omitempty"`
-	PexEnabled                bool    `json:"pex-enabled,omitempty"`
-	PeerPortRandomOnStart     bool    `json:"peer-port-random-on-start,omitempty"`
-	PortForwardingEnabled     bool    `json:"port-forwarding-enabled,omitempty"`
-	QueueStalledEnabled       bool    `json:"queue-stalled-enabled,omitempty"`
-	RenamePartialFiles        bool    `json:"rename-partial-files,omitempty"`
-	ScriptTorrentDoneEnabled  bool    `json:"script-torrent-done-enabled,omitempty"`
-	SeedRatioLimited          bool    `json:"seedRatioLimited,omitempty"`
-	SeedQueueEnabled          bool    `json:"seed-queue-enabled,omitempty"`
-	SpeedLimitDownEnabled     bool    `json:"speed-limit-down-enabled,omitempty"`
-	SpeedLimitUpEnabled       bool    `json:"speed-limit-up-enabled,omitempty"`
-	StartAddedTorrents        bool    `json:"start-added-torrents,omitempty"`
-	TrashOriginalTorrentFiles bool    `json:"trash-original-torrent-files,omitempty"`
-	UtpEnabled                bool    `json:"utp-enabled,omitempty"`
+	AltSpeedEnabled           bool    `json:"alt-speed-enabled"`
+	AltSpeedTimeEnabled       bool    `json:"alt-speed-time-enabled"`
+	BlockListEnabled          bool    `json:"blocklist-enabled"`
+	DownloadQueueEnabled      bool    `json:"download-queue-enabled"`
+	DhtEnabled                bool    `json:"dht-enabled"`
+	IdleSeedingLimitEnabled   bool    `json:"idle-seeding-limit-enabled"`
+	IncompleteDirEnabled      bool    `json:"incomplete-dir-enabled"`
+	LpdEnabled                bool    `json:"lpd-enabled"`
+	PexEnabled                bool    `json:"pex-enabled"`
+	PeerPortRandomOnStart     bool    `json:"peer-port-random-on-start"`
+	PortForwardingEnabled     bool    `json:"port-forwarding-enabled"`
+	QueueStalledEnabled       bool    `json:"queue-stalled-enabled"`
+	RenamePartialFiles        bool    `json:"rename-partial-files"`
+	ScriptTorrentDoneEnabled  bool    `json:"script-torrent-done-enabled"`
+	SeedRatioLimited          bool    `json:"seedRatioLimited"`
+	SeedQueueEnabled          bool    `json:"seed-queue-enabled"`
+	SpeedLimitDownEnabled     bool    `json:"speed-limit-down-enabled"`
+	SpeedLimitUpEnabled       bool    `json:"speed-limit-up-enabled"`
+	StartAddedTorrents        bool    `json:"start-added-torrents"`
+	TrashOriginalTorrentFiles bool    `json:"trash-original-torrent-files"`
+	UtpEnabled                bool    `json:"utp-enabled"`
 }

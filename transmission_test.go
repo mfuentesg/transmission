@@ -1322,9 +1322,14 @@ func TestClient_TorrentGet(t *testing.T) {
 			arguments: "{}",
 		},
 		{
-			name:      "should get a filled list of orders",
-			arguments: `{ "torrents": [{ "id": 123123, "name": "torrent1" }, { "id": 456456, "name": "torrent2" }] }`,
-			expected:  []Torrent{{ID: 123123, Name: "torrent1"}, {ID: 456456, Name: "torrent2"}},
+			name: "should get a filled list of orders",
+			arguments: `{ "torrents": [
+				{ "id": 123123, "name": "torrent1", "trackerStats": [{ "lastScrapeTimedOut" : 0 }] }, { "id": 456456, "name": "torrent2" }
+			] }`,
+			expected: []Torrent{
+				{ID: 123123, Name: "torrent1", TrackerStats: []TrackerStat{{LastScrapeTimedOut: false}}},
+				{ID: 456456, Name: "torrent2"},
+			},
 		},
 	}
 

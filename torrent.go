@@ -8,30 +8,30 @@ type File struct {
 
 type FileStat struct {
 	BytesCompleted int64 `json:"bytesCompleted,omitempty"`
-	Wanted         bool  `json:"wanted,omitempty"`
+	Wanted         bool  `json:"wanted"`
 	Priority       int64 `json:"priority,omitempty"`
 }
 
 type Peer struct {
 	Address            string  `json:"address,omitempty"`
 	ClientName         string  `json:"clientName,omitempty"`
-	ClientIsChoked     bool    `json:"clientIsChoked,omitempty"`
-	ClientIsInterested bool    `json:"clientIsInterested,omitempty"`
+	ClientIsChoked     bool    `json:"clientIsChoked"`
+	ClientIsInterested bool    `json:"clientIsInterested"`
 	FlagStr            string  `json:"flagStr,omitempty"`
-	IsDownloadingFrom  bool    `json:"isDownloadingFrom,omitempty"`
-	IsEncrypted        bool    `json:"isEncrypted,omitempty"`
-	IsIncoming         bool    `json:"isIncoming,omitempty"`
-	IsUploadingTo      bool    `json:"isUploadingTo,omitempty"`
-	IsUTP              bool    `json:"isUTP,omitempty"`
-	PeerIsChoked       bool    `json:"peerIsChoked,omitempty"`
-	PeerIsInterested   bool    `json:"peerIsInterested,omitempty"`
+	IsDownloadingFrom  bool    `json:"isDownloadingFrom"`
+	IsEncrypted        bool    `json:"isEncrypted"`
+	IsIncoming         bool    `json:"isIncoming"`
+	IsUploadingTo      bool    `json:"isUploadingTo"`
+	IsUTP              bool    `json:"isUTP"`
+	PeerIsChoked       bool    `json:"peerIsChoked"`
+	PeerIsInterested   bool    `json:"peerIsInterested"`
 	Port               int64   `json:"port,omitempty"`
 	Progress           float64 `json:"progress,omitempty"`
 	RateToClient       int64   `json:"rateToClient,omitempty"`
 	RateToPeer         int64   `json:"rateToPeer,omitempty"`
 }
 
-type PeerFrom struct {
+type PeersFrom struct {
 	FromCache    int64 `json:"fromCache,omitempty"`
 	FromDht      int64 `json:"fromDht,omitempty"`
 	FromIncoming int64 `json:"fromIncoming,omitempty"`
@@ -49,32 +49,32 @@ type Tracker struct {
 }
 
 type TrackerStat struct {
-	Announce              string `json:"announce,omitempty"`
-	AnnounceState         int64  `json:"announceState,omitempty"`
-	DownloadCount         int64  `json:"downloadCount,omitempty"`
-	Host                  string `json:"host,omitempty"`
-	ID                    int64  `json:"id,omitempty"`
-	LastAnnouncePeerCount int64  `json:"lastAnnouncePeerCount,omitempty"`
-	LastAnnounceResult    string `json:"lastAnnounceResult,omitempty"`
-	LastAnnounceStartTime int64  `json:"lastAnnounceStartTime,omitempty"`
-	LastAnnounceTime      int64  `json:"lastAnnounceTime,omitempty"`
-	LastScrapeResult      string `json:"lastScrapeResult,omitempty"`
-	LastScrapeStartTime   int64  `json:"lastScrapeStartTime,omitempty"`
-	LastScrapeTime        int64  `json:"lastScrapeTime,omitempty"`
-	LeecherCount          int64  `json:"leecherCount,omitempty"`
-	NextAnnounceTime      int64  `json:"nextAnnounceTime,omitempty"`
-	NextScrapeTime        int64  `json:"nextScrapeTime,omitempty"`
-	Scrape                string `json:"scrape,omitempty"`
-	ScrapeState           int64  `json:"scrapeState,omitempty"`
-	SeederCount           int64  `json:"seederCount,omitempty"`
-	Tier                  int64  `json:"tier,omitempty"`
-	HasAnnounced          bool   `json:"hasAnnounced,omitempty"`
-	HasScraped            bool   `json:"hasScraped,omitempty"`
-	IsBackup              bool   `json:"isBackup,omitempty"`
-	LastAnnounceSucceeded bool   `json:"lastAnnounceSucceeded,omitempty"`
-	LastAnnounceTimedOut  bool   `json:"lastAnnounceTimedOut,omitempty"`
-	LastScrapeSucceeded   bool   `json:"lastScrapeSucceeded,omitempty"`
-	LastScrapeTimedOut    bool   `json:"lastScrapeTimedOut,omitempty"`
+	Announce              string  `json:"announce,omitempty"`
+	AnnounceState         int64   `json:"announceState,omitempty"`
+	DownloadCount         int64   `json:"downloadCount,omitempty"`
+	Host                  string  `json:"host,omitempty"`
+	ID                    int64   `json:"id,omitempty"`
+	LastAnnouncePeerCount int64   `json:"lastAnnouncePeerCount,omitempty"`
+	LastAnnounceResult    string  `json:"lastAnnounceResult,omitempty"`
+	LastAnnounceStartTime int64   `json:"lastAnnounceStartTime,omitempty"`
+	LastAnnounceTime      int64   `json:"lastAnnounceTime,omitempty"`
+	LastScrapeResult      string  `json:"lastScrapeResult,omitempty"`
+	LastScrapeStartTime   int64   `json:"lastScrapeStartTime,omitempty"`
+	LastScrapeTime        int64   `json:"lastScrapeTime,omitempty"`
+	LeecherCount          int64   `json:"leecherCount,omitempty"`
+	NextAnnounceTime      int64   `json:"nextAnnounceTime,omitempty"`
+	NextScrapeTime        int64   `json:"nextScrapeTime,omitempty"`
+	Scrape                string  `json:"scrape,omitempty"`
+	ScrapeState           int64   `json:"scrapeState,omitempty"`
+	SeederCount           int64   `json:"seederCount,omitempty"`
+	Tier                  int64   `json:"tier,omitempty"`
+	HasAnnounced          bool    `json:"hasAnnounced"`
+	HasScraped            bool    `json:"hasScraped"`
+	IsBackup              bool    `json:"isBackup"`
+	LastAnnounceSucceeded bool    `json:"lastAnnounceSucceeded"`
+	LastAnnounceTimedOut  bool    `json:"lastAnnounceTimedOut"`
+	LastScrapeSucceeded   bool    `json:"lastScrapeSucceeded"`
+	LastScrapeTimedOut    NumBool `json:"lastScrapeTimedOut"`
 }
 
 type Torrent struct {
@@ -112,7 +112,7 @@ type Torrent struct {
 	PeerLimit               int64         `json:"peer-limit,omitempty"`
 	Peers                   []Peer        `json:"peers,omitempty"`
 	PeersConnected          int64         `json:"peersConnected,omitempty"`
-	PeersFrom               []PeerFrom    `json:"peersFrom,omitempty"`
+	PeersFrom               PeersFrom     `json:"peersFrom,omitempty"`
 	PeersGettingFromUs      int64         `json:"peersGettingFromUs,omitempty"`
 	PeersSendingToUs        int64         `json:"peersSendingToUs,omitempty"`
 	PercentDone             float64       `json:"percentDone,omitempty"`
@@ -143,10 +143,10 @@ type Torrent struct {
 	Wanted                  []int64       `json:"wanted,omitempty"`
 	WebSeeds                []string      `json:"webseeds,omitempty"`
 	WebSeedsSendingToUs     int64         `json:"webseedsSendingToUs,omitempty"`
-	DownloadLimited         bool          `json:"downloadLimited,omitempty"`
-	HonorsSessionLimits     bool          `json:"honorsSessionLimits,omitempty"`
-	IsFinished              bool          `json:"isFinished,omitempty"`
-	IsPrivate               bool          `json:"isPrivate,omitempty"`
-	IsStalled               bool          `json:"isStalled,omitempty"`
-	UploadLimited           bool          `json:"uploadLimited,omitempty"`
+	DownloadLimited         bool          `json:"downloadLimited"`
+	HonorsSessionLimits     bool          `json:"honorsSessionLimits"`
+	IsFinished              bool          `json:"isFinished"`
+	IsPrivate               bool          `json:"isPrivate"`
+	IsStalled               bool          `json:"isStalled"`
+	UploadLimited           bool          `json:"uploadLimited"`
 }
