@@ -8,16 +8,20 @@ type File struct {
 
 type FileStat struct {
 	BytesCompleted int64 `json:"bytesCompleted,omitempty"`
-	Wanted         bool  `json:"wanted"`
 	Priority       int64 `json:"priority,omitempty"`
+	Wanted         bool  `json:"wanted"`
 }
 
 type Peer struct {
 	Address            string  `json:"address,omitempty"`
 	ClientName         string  `json:"clientName,omitempty"`
+	FlagStr            string  `json:"flagStr,omitempty"`
+	Port               int64   `json:"port,omitempty"`
+	Progress           float64 `json:"progress,omitempty"`
+	RateToClient       int64   `json:"rateToClient,omitempty"`
+	RateToPeer         int64   `json:"rateToPeer,omitempty"`
 	ClientIsChoked     bool    `json:"clientIsChoked"`
 	ClientIsInterested bool    `json:"clientIsInterested"`
-	FlagStr            string  `json:"flagStr,omitempty"`
 	IsDownloadingFrom  bool    `json:"isDownloadingFrom"`
 	IsEncrypted        bool    `json:"isEncrypted"`
 	IsIncoming         bool    `json:"isIncoming"`
@@ -25,10 +29,6 @@ type Peer struct {
 	IsUTP              bool    `json:"isUTP"`
 	PeerIsChoked       bool    `json:"peerIsChoked"`
 	PeerIsInterested   bool    `json:"peerIsInterested"`
-	Port               int64   `json:"port,omitempty"`
-	Progress           float64 `json:"progress,omitempty"`
-	RateToClient       int64   `json:"rateToClient,omitempty"`
-	RateToPeer         int64   `json:"rateToPeer,omitempty"`
 }
 
 type PeersFrom struct {
