@@ -60,7 +60,7 @@ func main() {
 	transmission.WithBasicAuth("username", "password"),
     )
 
-    // this method is not part of the spec (just check connectivity)
+    // this method is not part of the spec (it just check connectivity)
     if err := client.Ping(context.Background()); err != nil {
         log.Fatalf("could not connect to transmission service: %+v", err)
     }
